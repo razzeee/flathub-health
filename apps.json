@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "apps": [
+    {
+      "app_id": "org.gnome.Calculator",
+      "name": "Calculator",
+      "branch": "stable",
+      "arch": "x86_64",
+      "recipe": "recipes/org.gnome.Calculator.yml",
+      "limitations": "Tests GTK startup and captures arithmetic. The test does not check other app functions."
+    },
+    {
+      "app_id": "org.kde.kcalc",
+      "name": "KCalc",
+      "branch": "stable",
+      "arch": "x86_64",
+      "recipe": "recipes/org.kde.kcalc.yml",
+      "limitations": "Tests Qt startup and captures arithmetic. The test does not check other app functions."
+    },
+    {
+      "app_id": "com.vscodium.codium",
+      "name": "VSCodium",
+      "branch": "stable",
+      "arch": "x86_64",
+      "recipe": "recipes/com.vscodium.codium.yml",
+      "limitations": "Tests Electron startup and captures the editor. The recipe depends on getting-started text that may change. It does not test extensions or accounts."
+    },
+    {
+      "app_id": "org.videolan.VLC",
+      "name": "VLC",
+      "branch": "stable",
+      "arch": "x86_64",
+      "limitations": "Tests startup only. No screenshot recipe yet. It does not test media playback, codecs, audio output, or hardware acceleration. First-run dialogs may affect startup results."
+    },
+    {
+      "app_id": "org.libreoffice.LibreOffice",
+      "name": "LibreOffice",
+      "branch": "stable",
+      "arch": "x86_64",
+      "limitations": "Tests startup only. No screenshot recipe yet. It does not open, edit, or export documents. A visible start center does not prove that the office tools work."
+    }
+  ]
+}

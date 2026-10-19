@@ -1,0 +1,15 @@
+version: 1
+window:
+  width: 400
+  height: 650
+steps:
+  - capture:
+      name: overview
+      caption: Calculator is ready for input.
+  - key: "2"
+  - key: plus
+  - key: "2"
+  - key: Return
+  - capture:
+      name: calculation
+      caption: Calculator shows the result of 2 + 2.
