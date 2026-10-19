@@ -2,101 +2,111 @@
 
 ## Purpose
 
-Run flatpak-smoke against a curated selection of popular Flathub applications,
-report installation/startup problems, and capture reproducible screenshots.
-Keep orchestration and app-specific recipes here; generic testing and capture
-functionality belongs in flatpak-smoke.
+Run flatpak-smoke against selected Flathub apps. Report installation and startup
+problems, and capture reproducible screenshots. Keep app selection and recipes
+here. Keep test execution and screenshot capture in flatpak-smoke.
 
-Runner source: `/home/razze/dev/from-framework/flatpak-smoke`
-(upstream: `razzeee/flatpak-smoke`).
+The local runner source is `/home/razze/dev/from-framework/flatpak-smoke`.
+Its upstream repository is `razzeee/flatpak-smoke`.
 
 ## First milestone
 
-- Small, reviewed catalog with stable app IDs and explicit branch/architecture.
-- Daily and manually dispatched GitHub Actions runs, one isolated job per app,
-  bounded concurrency/timeouts, and matrix fail-fast disabled.
-- Test released Flathub apps rather than rebuilding application manifests.
-- Smoke-test startup and run optional app-specific screenshot recipes.
-- Always upload results, screenshots, and diagnostic logs, including on failure.
-- Summarize app, recipe, and infrastructure/download failures separately.
-  Passing startup checks does not prove that all app functionality works.
+- Review a small catalog with stable app IDs and explicit branches and architectures.
+- Support manual and daily GitHub Actions runs. Give each app a separate job,
+  limit concurrency and execution time, and disable matrix fail-fast.
+- Test released Flathub apps without rebuilding their manifests.
+- Test startup and run optional app-specific screenshot recipes.
+- Upload results, screenshots, and logs after failures as well as passes.
+- Report app failures, recipe failures, and infrastructure or download failures
+  separately. A startup pass does not test every app function.
 
-## Suggested layout
+## Files
 
 ```text
-apps.json                       # curated catalog
-recipes/<app-id>.yml             # screenshot interactions
+apps.json                       # app catalog
+recipes/<app-id>.yml             # screenshot steps
 fixtures/<app-id>/               # redistributable sample documents
 scripts/catalog.ts              # validation and CI matrix generation
-scripts/run.ts                  # prepare app and invoke pinned flatpak-smoke
-scripts/report.ts               # aggregate results and render summary
-tests/                          # catalog, execution, reporting tests
-.github/workflows/check-apps.yml # schedule + workflow_dispatch + matrix
+scripts/run.ts                  # app preparation and pinned runner invocation
+scripts/report.ts               # combined results and summary
+tests/                          # catalog, execution, and reporting tests
+.github/workflows/check-apps.yml # manual dispatch and app matrix
 ```
 
-Catalog fields: app ID, display name, branch, architecture, optional recipe,
-and documented compatibility limitations. Do not embed shell commands in the
-catalog; execute commands using argument arrays.
+Each catalog entry has an app ID, display name, branch, architecture, optional
+recipe, and compatibility limitations. Do not put shell commands in the catalog.
+Pass commands as argument arrays.
 
-## Initial coverage
+## Initial apps
 
-Bootstrap with Calculator, KCalc, and VSCodium using flatpak-smoke's existing
-`tests/compatibility/` recipes. These cover toolkits, not necessarily popularity.
-Then choose roughly 5–10 popular apps using a documented, dated Flathub
-popularity source. Cover GTK, Qt, Electron, and media/document workflows.
-Avoid accounts, paid content, and hardware-dependent assertions initially.
+Start with Calculator, KCalc, and VSCodium. Reuse flatpak-smoke's
+`tests/compatibility/` recipes. These apps cover different toolkits, not a
+popularity ranking.
+
+The catalog now also includes VLC and LibreOffice for media and document
+coverage. They have startup checks only until we can verify screenshot recipes.
+[docs/catalog-selection.md](docs/catalog-selection.md) records the selection
+sources. The expanded catalog has five apps. Avoid accounts, paid content, and
+hardware-dependent checks. Keep dated Flathub popularity evidence for future
+additions instead of assuming the catalog is a ranking.
 
 ## Execution
 
-1. Validate the catalog and generate the matrix.
-2. Resolve each current Flathub release; record its OSTree commit, version,
-   runtime, branch, architecture, runner version/image digest, and test time.
-3. Prepare an isolated installation and clean profile; run the smoke check.
-4. Run an optional screenshot recipe with a fresh seeded profile. Record its
-   outcome separately so a stale recipe does not label an app broken.
-5. Upload diagnostics even on failure. Treat missing job artifacts as incomplete,
-   never as success.
+1. Validate the catalog and generate the job matrix.
+2. Resolve each current Flathub release. Record its OSTree commit, version,
+   runtime, branch, architecture, runner version and image digest, and test time.
+3. Create an isolated installation and clean profile, then test startup.
+4. Run the screenshot recipe with a separate fresh profile and any sample files.
+   Record its outcome separately. A recipe that no longer matches the app does
+   not prove the app is broken.
+5. Upload diagnostics after failures. Treat missing job artifacts as incomplete,
+   never as passes.
 
-Before implementation, inspect the runner CLI, action inputs, and
-`tests/compatibility/prepare.py`. The documented action accepts bundles: do not
-assume an app-ID input exists. Reuse a supported remote-install/local-repository
-path or prepare bundles following the compatibility approach. Document any
-missing runner capability instead of duplicating it here.
+Before choosing an installation path, check the runner CLI, action inputs, and
+`tests/compatibility/prepare.py`. The action accepts bundles. Do not assume it
+has an app-ID input. Reuse a supported remote installation or local repository,
+or prepare bundles as the compatibility tests do. Document missing runner
+capabilities instead of implementing them here.
 
-Pin a published runner release/image. Its README currently references v0.1.2
-with a publication caveat; verify availability before selecting it. Bound
-installation and execution separately. Keep privileged execution isolated from
-secrets and untrusted PR code; reporting gets minimal permissions.
+Pin a published runner release and image. The upstream README references
+v0.1.2 but says its images need publication. Check availability before using it.
+Set separate installation and execution timeouts. Run privileged containers
+without secrets or untrusted PR code. Give the report job read-only permissions.
 
-## Reporting and follow-ups
+## Reports and later work
 
-Start with GitHub job summaries and downloadable artifacts. Later add a static
-screenshot gallery and history with explicit retention/storage limits. Record
-app and environment metadata before comparing runs. Screenshots are review
-evidence, not automatic pixel-diff failure criteria. Do not automatically publish
-listing screenshots or file upstream issues.
+Start with GitHub job summaries and downloadable artifacts. A later screenshot
+gallery and history need storage and retention limits. Record app versions and
+environment metadata before comparing runs. Review screenshots as evidence,
+not pixel-diff pass criteria. Do not publish listing screenshots or file upstream
+issues automatically.
 
-Later: retry suspected transient failures once, detect newly failing apps,
-run on app releases, and add opt-in notifications after measuring noise.
+Later, retry suspected transient failures once and detect newly failing apps.
+Consider app-release triggers and opt-in notifications after measuring noise.
 
 ## Acceptance checks
 
-- Tests cover catalog validation, matrix generation, runner exit handling, and
-  aggregation with failed/missing jobs.
-- A manual end-to-end run produces results and screenshots for the bootstrap
-  apps, or records concrete compatibility failures.
-- A deliberately failing app/recipe does not suppress other app artifacts.
+- Tests cover catalog validation, matrix generation, runner exit codes, and
+  combined results with failed or missing jobs.
+- A manual end-to-end run produces results and screenshots for the initial
+  apps, or records specific compatibility failures.
+- A deliberately failing app or recipe does not prevent other jobs from
+  uploading their artifacts.
 - Every report identifies the exact app and runner versions tested.
-- Document setup, concurrency/cost limits, retention, and adding an app.
+- The documentation explains setup, concurrency, cost limits, retention,
+  and how to add an app.
 
 ## Current state
 
-Bootstrap catalog, recipes, TypeScript orchestration scripts, Node tests, and a
-manual workflow are implemented. The daily trigger is deferred until hosted
-end-to-end validation succeeds. Effect was assessed and deferred; see
-`docs/typescript-dependencies.md`. See `docs/validation.md` for verified behavior and
-concrete blockers: missing published runner images and local Docker access.
-No successful desktop end-to-end run is claimed. Popularity-based expansion
-remains after bootstrap validation. The GitHub repository is
-`https://github.com/razzeee/flathub-health`. No hosted test run, daily schedule,
-scheduled task, or published gallery has been started.
+The catalog, recipes, TypeScript scripts, Node tests, and manual workflow exist.
+The daily trigger will wait until hosted end-to-end validation passes.
+[docs/typescript-dependencies.md](docs/typescript-dependencies.md) explains why
+we did not add Effect.
+
+[docs/validation.md](docs/validation.md) records the current limits. Runner images
+are missing, local Docker access fails, and no desktop end-to-end run has passed.
+The two added apps still need hosted startup validation. All screenshot recipes
+still need an end-to-end run.
+
+The repository is [razzeee/flathub-health](https://github.com/razzeee/flathub-health).
+No hosted test run, daily schedule, recurring task, or gallery is active.

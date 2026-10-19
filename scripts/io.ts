@@ -23,7 +23,7 @@ export function beneath(root: string, path: string): boolean {
   );
 }
 
-// Resolve existing ancestors too, so an output-directory symlink cannot escape.
+// Resolve parent symlinks before checking whether the output stays in the workspace.
 export function canonical(path: string): string {
   try {
     return realpathSync(path);

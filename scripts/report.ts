@@ -1,4 +1,4 @@
-/** Absent, corrupt, or mismatched job artifacts are never successes. */
+/** Mark missing or invalid job artifacts as incomplete. */
 import { isDeepStrictEqual } from "node:util";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -46,9 +46,9 @@ export function render(rows: ReportRow[]): string {
   const lines = [
     "# Flathub health",
     "",
-    "Startup checks are not full functionality tests. Recipe failures do not label an app broken.",
+    "A startup pass does not test every app function. A recipe failure can mean its steps no longer match the app.",
     "",
-    "| App | Preparation / downloads | Startup | Recipe |",
+    "| App | Preparation and downloads | Startup | Recipe |",
     "| --- | --- | --- | --- |",
   ];
   for (const row of rows) {
@@ -61,7 +61,7 @@ export function render(rows: ReportRow[]): string {
       "",
       `## ${cell(row.app.app_id)}`,
       `Tested: ${cell("tested_at" in row ? row.tested_at : "unavailable")}`,
-      `App provenance: ${cell(JSON.stringify("resolved" in row ? row.resolved : {}))}`,
+      `App version details: ${cell(JSON.stringify("resolved" in row ? row.resolved : {}))}`,
       `Runner: ${cell(JSON.stringify("runner" in row ? row.runner : {}))}`,
     );
     for (const phase of phases) {

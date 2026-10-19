@@ -61,8 +61,8 @@ export const command: Executor = async (args, log, options = {}) => {
         if (failure) return;
         failure = error;
         writeSync(fd, `\n${error.message}\n`);
-        // A rejected promise alone does not stop processes. Signal the Linux
-        // process group; allow upstream's TERM handler to remove its container.
+        // Rejecting a promise does not stop the process. Signal its Linux process
+        // group and give the upstream TERM handler time to remove its container.
         killGroup("SIGTERM");
         escalation = setTimeout(
           () => killGroup("SIGKILL"),
@@ -82,7 +82,7 @@ export const command: Executor = async (args, log, options = {}) => {
       );
       process.once("SIGTERM", interrupt);
       process.once("SIGINT", interrupt);
-      child.stdout!.setEncoding("utf8"); // stdout is explicitly piped above.
+      child.stdout!.setEncoding("utf8"); // spawn pipes stdout above.
       child.stdout!.on("data", (chunk: string) => {
         writeSync(fd, chunk);
         if (stdout.length + chunk.length > 8 * 1024 * 1024) {

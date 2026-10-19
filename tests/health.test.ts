@@ -57,9 +57,21 @@ function record(selected = app()): Health {
   };
 }
 
-test("bootstrap catalog and matrix", () => {
+test("five-app catalog and job matrix", () => {
   const apps = load();
-  assert.equal(apps.length, 3);
+  assert.deepEqual(
+    apps.map(({ app_id }) => app_id),
+    [
+      "org.gnome.Calculator",
+      "org.kde.kcalc",
+      "com.vscodium.codium",
+      "org.videolan.VLC",
+      "org.libreoffice.LibreOffice",
+    ],
+  );
+  assert.ok(
+    apps.every(({ branch, arch }) => branch === "stable" && arch === "x86_64"),
+  );
   assert.deepEqual(matrix(apps), {
     include: apps.map(({ app_id }) => ({ app_id })),
   });
@@ -191,7 +203,7 @@ test("runner configuration schema rejects malformed and unknown fields", (t) => 
   assert.deepEqual(loadRunner(root), config);
 });
 
-test("upstream schema validates consumed fields but allows future metadata", () => {
+test("upstream schema validates known fields and allows future metadata", () => {
   const passed = {
     schema_version: 1,
     status: "passed",
@@ -403,6 +415,54 @@ test("unavailable screenshot image preserves completed startup results", async (
   assert.equal(reported[0]!.phases.screenshots.status, "infrastructure_failed");
 });
 
+test("startup-only apps skip screenshot preparation and report it as not requested", async (t) => {
+  const apps = load().filter((app) => !app.recipe);
+  assert.deepEqual(
+    apps.map(({ app_id }) => app_id),
+    ["org.videolan.VLC", "org.libreoffice.LibreOffice"],
+  );
+  for (const selected of apps) {
+    const root = temporary(t);
+    cpSync(join(ROOT, "runner.json"), join(root, "runner.json"));
+    const config = loadRunner(root);
+    const commands: string[][] = [];
+    const modes: string[] = [];
+    const execute: Executor = async (args) => {
+      commands.push(args);
+      return {
+        code: 0,
+        stdout:
+          args.at(-1) === "HEAD"
+            ? config.revision
+            : args.includes("inspect")
+              ? JSON.stringify([
+                  `ghcr.io/example/image@sha256:${"a".repeat(64)}`,
+                ])
+              : args.includes("--columns=application,version")
+                ? `${selected.app_id}\t1.0`
+                : "example",
+      };
+    };
+    const row = await runApp(selected, root, join(root, "artifacts"), {
+      root,
+      execute,
+      invoke: async ({ mode }) => {
+        modes.push(mode);
+        return { status: "passed" };
+      },
+    });
+    assert.deepEqual(modes, ["verify"]);
+    assert.ok(
+      commands.every((args) => !args.includes(config.screenshots_image)),
+    );
+    assert.equal(row.runner.screenshots_digest, undefined);
+    assert.equal(row.phases.screenshots.status, "not_requested");
+    const reported = aggregate([selected], join(root, "artifacts"));
+    assert.equal(reported[0]!.phases.verify.status, "passed");
+    assert.equal(reported[0]!.phases.screenshots.status, "not_requested");
+  }
+});
+
 test("upstream action invocation validates ref and real screenshot files", async (t) => {
   const root = temporary(t);
   const output = join(root, "artifacts", app().app_id);
@@ -441,7 +501,7 @@ test("upstream action invocation validates ref and real screenshot files", async
   assert.equal((await invoke(options)).status, "infrastructure_failed");
 });
 
-test("aggregation keeps failed jobs, identifies missing/corrupt jobs and renders provenance", (t) => {
+test("report keeps failed jobs, identifies missing or corrupt jobs, and includes version details", (t) => {
   const root = temporary(t);
   const apps = load();
   const path = join(root, app().app_id);
@@ -451,7 +511,7 @@ test("aggregation keeps failed jobs, identifies missing/corrupt jobs and renders
   row.phases.screenshots = { status: "recipe_failed" };
   writeJson(join(path, "health.json"), row);
   const rows = aggregate(apps, root);
-  assert.equal(rows.length, 3);
+  assert.equal(rows.length, apps.length);
   assert.equal(rows[0]!.phases.verify.status, "app_failed");
   assert.equal(rows[1]!.phases.verify.status, "incomplete");
   assert.match(render(rows), /&lt;error&gt;&#124;message/);
@@ -462,7 +522,7 @@ test("aggregation keeps failed jobs, identifies missing/corrupt jobs and renders
   assert.ok("error" in aggregate(apps, root)[0]!);
 });
 
-test("passing artifacts require app and runner provenance; JSON field order is irrelevant", (t) => {
+test("passing artifacts require app and runner version details regardless of JSON field order", (t) => {
   const root = temporary(t);
   const path = join(root, app().app_id);
   mkdirSync(path);
@@ -480,7 +540,7 @@ test("passing artifacts require app and runner provenance; JSON field order is i
   assert.ok(readJson(file));
 });
 
-test("artifact schemas reject malformed metadata, phase outcomes and provenance", (t) => {
+test("artifact schemas reject malformed metadata, phase outcomes, and version details", (t) => {
   const root = temporary(t);
   const path = join(root, app().app_id);
   mkdirSync(path);

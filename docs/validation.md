@@ -1,35 +1,40 @@
-# Bootstrap validation — 2026-10-19
+# Validation results, 2026-10-19
 
-## Runner investigation
+## Runner checks
 
-Inspected the upstream CLI documentation, action inputs and `action/run.py`,
-and `tests/compatibility/prepare.py` in
-`/home/razze/dev/from-framework/flatpak-smoke`. Also fetched the published
-v0.1.1 `action/run.py` to verify the supported bundle path. No app-ID action
-input is assumed. Upstream provides all generic testing, capture, cleanup, and
-fresh-profile functionality.
+We checked the runner CLI, action inputs, `action/run.py`, and
+`tests/compatibility/prepare.py` in
+`/home/razze/dev/from-framework/flatpak-smoke`. We also fetched the published
+v0.1.1 `action/run.py` to confirm that it accepts bundles. Our scripts do not
+assume an app-ID action input. The upstream runner handles app testing,
+screenshots, cleanup, and fresh profiles.
 
-Verified with GitHub API:
+These commands identified the release and image availability:
 
-- `gh api repos/razzeee/flatpak-smoke/releases/latest`: v0.1.1, published
-  2026-09-18, no release assets.
-- `gh api repos/razzeee/flatpak-smoke/git/ref/tags/v0.1.1`:
+- `gh api repos/razzeee/flatpak-smoke/releases/latest` returned v0.1.1, published
+  on 2026-09-18, with no release assets.
+- `gh api repos/razzeee/flatpak-smoke/git/ref/tags/v0.1.1` returned commit
   `718df5b31ff138dec6b8361ae1eef535667db1cb`.
-- `docker manifest inspect ghcr.io/razzeee/flatpak-smoke:v0.1.1`:
-  `manifest unknown`, exit 1.
-- `docker manifest inspect ghcr.io/razzeee/flatpak-smoke-screenshots:v0.1.1`:
-  `manifest unknown`, exit 1.
+- `docker manifest inspect ghcr.io/razzeee/flatpak-smoke:v0.1.1` returned
+  `manifest unknown` and exit code 1.
+- `docker manifest inspect ghcr.io/razzeee/flatpak-smoke-screenshots:v0.1.1`
+  returned `manifest unknown` and exit code 1.
 
-Image publication is an upstream deployment blocker, not an app compatibility
-failure. Publication/update needs a separate upstream action; no generic runner
-functionality was duplicated here to work around it.
+The runner images need publication before these releases can run. Their absence
+does not indicate an app compatibility problem. We did not replace upstream
+runner code to work around it.
 
-## Local manual attempts
+## Local runs
 
-Before the TypeScript migration, cloned the exact v0.1.1 runner into ignored
-`.runner/`. Invoked the original Python wrapper
-`python3 scripts/run.py --app <app-id>` separately for all three bootstrap apps.
-Each returned exit 1 and saved its own `health.json` and preparation log:
+Before the TypeScript migration, we cloned v0.1.1 into `.runner/` and ran the
+original Python wrapper for each app:
+
+```sh
+python3 scripts/run.py --app <app-id>
+```
+
+That wrapper no longer exists in this repository. Each attempt returned exit
+code 1 and saved a separate `health.json` and preparation log.
 
 | App                  | Preparation           | Startup    | Recipe     |
 | -------------------- | --------------------- | ---------- | ---------- |
@@ -37,54 +42,62 @@ Each returned exit 1 and saved its own `health.json` and preparation log:
 | org.kde.kcalc        | infrastructure_failed | incomplete | incomplete |
 | com.vscodium.codium  | infrastructure_failed | incomplete | incomplete |
 
-All three hit `docker info`: permission denied connecting to
-`unix:///var/run/docker.sock`. Preparation deliberately stops before downloading
-apps when the container backend is unavailable. Thus no resolved app versions,
-screenshots, or app compatibility conclusions are available. Ignored diagnostic
-outputs are local under `artifacts/`; this document preserves the findings.
+All attempts stopped at `docker info`. Docker denied access to
+`unix:///var/run/docker.sock`. Preparation stops before downloading apps if
+the container backend is unavailable. We have no resolved app versions,
+screenshots, or app compatibility results from these attempts. The local
+diagnostics remain under the ignored `artifacts/` directory.
 
-## TypeScript migration validation
+## After the TypeScript migration
 
-The repository's orchestration and tests now run on Node.js 24. The only Python
-entry point still used is the pinned upstream `.runner/action/run.py`.
-Effect was evaluated and deferred; see `typescript-dependencies.md`.
+Our scripts and tests now run on Node.js 24. The pinned upstream
+`.runner/action/run.py` still needs Python. The
+[dependency assessment](typescript-dependencies.md) explains why we did not
+add Effect.
 
-Repeated preparation through the TypeScript `runApp` entry point for all three
-bootstrap apps, using an isolated workspace at `artifacts/typescript-validation/`
-to preserve the original Python diagnostics. All three produced the same
-`infrastructure_failed` Docker permission result and saved separate logs and
-`health.json` files. The TypeScript reporter also consumed the existing Python
-artifacts successfully, preserving the artifact format and expected nonzero
-report exit status.
+We repeated preparation through `runApp` for each app. A separate workspace at
+`artifacts/typescript-validation/` preserved the earlier diagnostics. All three
+attempts recorded the same Docker permission error and saved their logs and
+`health.json` files.
 
-## Verified locally
+The TypeScript reporter also read the Python-era artifacts. It preserved their
+failure results and returned a nonzero exit code.
 
-- Catalog validation and generation of the three-entry matrix.
-- `pnpm install --frozen-lockfile`: installs the pinned dependency graph.
-- `pnpm format:check`: maintained files match Prettier formatting.
-- `pnpm check`: strict TypeScript checking passes.
-- `pnpm test`: 17 Node tests pass, covering validation, runner exits/timeouts, failure classification,
-  preparation diagnostics, recipe execution after startup failure, and aggregation
-  of failed, corrupt, missing, and provenance-incomplete job artifacts. New tests
-  check TERM-resistant processes, grandchild process-group cleanup, external
-  cancellation, partial logs, argv preservation, symlink escapes, and actual
-  screenshot-file/ref evidence validation.
-- Zod schema tests reject malformed runner configuration, upstream results,
-  artifact metadata, phase outcomes, and provenance while accepting additional
-  upstream metadata fields for forward compatibility.
-- A simulated unavailable screenshot image leaves completed startup results
-  intact and is reported only as screenshot infrastructure failure.
-- Workflow and recipe YAML parse successfully.
+## Checks that pass
 
-## Still required
+- The expanded catalog validates and produces a matrix with five apps. VLC and
+  LibreOffice have startup checks only. The local attempts above covered only
+  the original three apps.
+- `pnpm install --frozen-lockfile` installs the locked dependencies.
+- `pnpm format:check` finds no formatting errors.
+- `pnpm check` finds no TypeScript errors.
+- All 18 tests pass. They cover validation, runner exit codes, timeouts, failure
+  classification, preparation logs, and recipes after startup failures. They
+  also cover missing or corrupt artifacts, required version metadata, process
+  cleanup, cancellation, partial logs, argument arrays, and path checks.
+- Zod rejects malformed configuration, upstream results, artifact metadata,
+  phase outcomes, and version metadata. It accepts extra upstream metadata
+  fields for compatibility with future releases.
+- A simulated missing screenshot image leaves startup results intact. The
+  report records the image error under screenshot infrastructure failure.
+- An app without a recipe skips the screenshot image and phase. Its report marks
+  that phase as `not_requested`.
+- The workflow and recipe files parse as YAML.
 
-1. Publish compatible upstream release images and give the test runner Docker
-   access (or run on disposable GitHub-hosted VMs).
-2. Repeat bootstrap end-to-end, retaining real results and screenshots; deliberately
-   break one recipe and confirm all other matrix artifacts survive.
-3. Record a dated Flathub popularity source before selecting 5–10 broader apps.
-4. Push to `https://github.com/razzeee/flathub-health`, run the manual workflow,
-   and only enable a daily schedule after the end-to-end acceptance checks pass.
+## Checks still needed
 
-The full end-to-end acceptance check is **blocked**, not passed. Synthetic tests
-prove orchestration behavior, not desktop compatibility or hosted CI behavior.
+1. Publish compatible runner images and provide Docker access. Disposable
+   GitHub-hosted VMs are an option.
+2. Run all five apps end-to-end and retain their results. Retain screenshots
+   for the three apps with recipes. Verify recipes for the two new apps before
+   adding them.
+   Break one recipe and confirm that the other matrix jobs still upload
+   artifacts.
+3. Keep the dated selection sources in `catalog-selection.md` up to date when
+   adding more apps.
+4. Run the manual workflow in
+   [razzeee/flathub-health](https://github.com/razzeee/flathub-health).
+   Add a daily schedule only after the end-to-end checks pass.
+
+The end-to-end acceptance check has not passed. The tests verify script behavior,
+not desktop compatibility or hosted CI behavior.

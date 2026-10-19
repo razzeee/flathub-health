@@ -101,7 +101,7 @@ export const healthSchema = z
       ) {
         context.addIssue({
           code: "custom",
-          message: "missing startup provenance",
+          message: "missing app or startup runner version details",
         });
       }
     }
@@ -112,14 +112,14 @@ export const healthSchema = z
     ) {
       context.addIssue({
         code: "custom",
-        message: "missing recipe runner provenance",
+        message: "missing screenshot runner image digest",
       });
     }
   });
 export type Health = z.infer<typeof healthSchema>;
 
-// Upstream can add fields without breaking this consumer. Validate the fields we
-// use, but leave screenshots/ref optional here so failed early runs still decode.
+// Accept extra upstream fields. A run that fails before launch can omit the
+// screenshots and app ref, so check those separately before accepting a pass.
 const upstreamFields = {
   schema_version: z.literal(1),
   app_ref: z.string().nullable().optional(),

@@ -1,37 +1,45 @@
-<img src="assets/icon.svg" width="64" height="64" alt="">
+<img src="assets/icon.svg" width="80" height="80" alt="Flathub health logo">
 
 # flathub-health
 
-Startup checks and reproducible screenshot recipes for released Flathub
-apps. This repository orchestrates [flatpak-smoke](https://github.com/razzeee/flatpak-smoke);
-it does not build app manifests or implement its own desktop automation.
+Check whether released Flathub apps install and open a window, then capture
+screenshots with app-specific recipes.
+[flatpak-smoke](https://github.com/razzeee/flatpak-smoke) runs the tests and
+desktop automation. This repository selects apps, prepares bundles, and reports
+the results. It does not rebuild app manifests.
 
 ## Status
 
-Bootstrap catalog: Calculator (GTK), KCalc (Qt), and VSCodium (Electron).
-These are toolkit examples, **not a popularity ranking**. Recipes originate from
-flatpak-smoke's `tests/compatibility/` at the revision in `runner.json`.
+The catalog has five apps. Calculator, KCalc, and VSCodium cover GTK, Qt, and
+Electron. Their recipes come from flatpak-smoke's `tests/compatibility/` at the
+revision in `runner.json`. VLC and LibreOffice add media and document apps with
+startup checks only. They have no screenshot recipes yet. See
+[the selection notes](docs/catalog-selection.md) for sources and test limits.
 
-**End-to-end screenshots are currently blocked.** On 2026-10-19 the latest
-published runner release was `v0.1.1` (revision
-`718df5b31ff138dec6b8361ae1eef535667db1cb`), but both corresponding GHCR
-image manifests returned `manifest unknown`. The upstream README's `v0.1.2`
-examples explicitly require publication. We pin the published source release;
-we do not silently build a different runner or substitute `latest`.
-Local bootstrap attempts also found Docker daemon permission denied. See
-[validation evidence](docs/validation.md). No app has been declared broken.
+No end-to-end run has reached app testing. On 2026-10-19, both GHCR images for
+the latest published runner release, `v0.1.1`, returned `manifest unknown`.
+The upstream README's `v0.1.2` examples also require image publication. Local
+runs stopped because Docker denied access to its socket. See the commands and
+results in [docs/validation.md](docs/validation.md).
 
-## Setup and local use
+The workflow is manual-only. No hosted run has started, and no daily schedule
+is active. These failures tell us nothing about app compatibility yet.
 
-Requirements: Linux x86_64, Node.js 24.2+ (use the current Node 24 LTS), Python
-3.10+ (only for the upstream
-action wrapper), Git, Flatpak, GNU `timeout`, and Docker with permission to run
-privileged containers. Our scripts run TypeScript directly using Node's native
-type stripping; no build step is required. Zod is the runtime dependency for
-JSON validation and inferred TypeScript types. TypeScript, Node type definitions,
-and Prettier are development dependencies only.
-Use pnpm 12.6.0, pinned in `package.json`; CI installs that version automatically.
-Allow several GB of disk/downloads per app; screenshot images include a desktop.
+## Setup
+
+Use Linux x86_64 with these tools:
+
+- Node.js 24.2 or newer. Use the current Node 24 LTS release.
+- pnpm 12.6.0, pinned in `package.json`.
+- Python 3.10 or newer for the upstream action wrapper.
+- Git, Flatpak, GNU `timeout`, and Docker with privileged-container access.
+
+Node runs the TypeScript files without a build step. Zod validates JSON at
+runtime and supplies the TypeScript types. TypeScript, Node type definitions,
+and Prettier are development dependencies.
+
+Allow several GB of disk space and downloads per app. The screenshot image
+includes a desktop environment.
 
 ```sh
 pnpm install --frozen-lockfile
@@ -43,95 +51,118 @@ git clone --branch v0.1.1 --depth 1 https://github.com/razzeee/flatpak-smoke.git
 node scripts/run.ts --app org.gnome.Calculator
 node scripts/run.ts --app org.kde.kcalc
 node scripts/run.ts --app com.vscodium.codium
+node scripts/run.ts --app org.videolan.VLC
+node scripts/run.ts --app org.libreoffice.LibreOffice
 node scripts/report.ts
 ```
 
-Each run writes `artifacts/<app-id>/health.json`, preparation/action logs, and
-upstream `verify/` and `screenshots/` results when those phases can run. The
-aggregator writes `artifacts/report/{report.json,summary.md}`. Nonzero exit codes
-are expected for failures or incomplete evidence. Run apps separately even if a
-previous command fails. Outputs are refused if already present: archive them and
-remove **only** the corresponding generated `artifacts/<app-id>` and
-`.health-work/<app-id>` directories before repeating a run. Local outputs have
-no automatic retention policy.
+Run each app command even if the previous one fails. The scripts return a
+nonzero exit code for failures or incomplete results.
 
-Effect was assessed and deferred: Actions handles app concurrency, while this
-small sequential CLI benefits more from a tested process adapter than a new
-effect runtime. See [the dependency assessment](docs/typescript-dependencies.md)
-for tradeoffs and criteria for revisiting it. JSON is validated at runtime;
-TypeScript types alone are not trusted for catalogs or downloaded artifacts:
-Zod validates catalog entries, runner configuration, upstream results, and health
-artifacts. Filesystem containment, catalog uniqueness, and screenshot evidence
-are still checked explicitly. Use `pnpm format` to format the maintained files;
-generated outputs, the upstream checkout, dependencies, and the lockfile are
-excluded. CI checks formatting and installs runtime dependencies in app/report jobs.
+## Results and repeat runs
 
-The app is installed from the explicit Flathub ref into a separate
-`FLATPAK_USER_DIR` under `.health-work/`, then exported with `flatpak build-bundle`.
-The upstream action installs that bundle in a fresh privileged container for
-each phase and downloads its runtime. Startup and recipes use separate clean
-profiles, running as `nobody`. Recipe `setup.files` can seed sample data; sources
-are relative to the recipe. Put redistributable fixtures under `fixtures/<app-id>/`
-and document their license. There are no fixtures required by the bootstrap apps.
+Each app writes `artifacts/<app-id>/health.json` and preparation logs. When the
+runner starts, its `verify/` and `screenshots/` directories contain results,
+screenshots, and logs. The reporter writes
+`artifacts/report/{report.json,summary.md}`.
 
-`runner.json` pins the source revision and image release tags. Each image is
-pulled once per job, its immutable repository digest is recorded, and that digest
-is used for execution. Reports include app version, branch/architecture/ref,
-OSTree commit, runtime ref/commit, runner revision/digests, runner environment,
-and UTC test time. Unresolved versions are explicitly unavailable, not invented.
-Runtime downloads can change between phases; the recorded runtime commit is the
-preparation installation, not a promise that both containers used that commit.
+The scripts refuse to overwrite an existing run. Archive its output, then remove
+only that app's generated `artifacts/<app-id>` and `.health-work/<app-id>`
+directories before repeating it. Local outputs do not expire automatically.
+
+The script installs the selected Flathub ref in a separate `FLATPAK_USER_DIR`
+under `.health-work/` and exports a bundle with `flatpak build-bundle`. The
+upstream action installs that bundle in a fresh container for each phase.
+Startup tests and screenshot recipes run as `nobody` with separate clean
+profiles. Each container downloads its runtime.
+
+`runner.json` pins the runner source revision and image release tags. The script
+pulls each image once per job, records its immutable digest, and runs that digest.
+Reports include the app version, ref, OSTree commit, runtime ref and commit,
+runner revision and image digests, runner environment, and UTC test time.
+Unresolved versions appear as unavailable or unknown.
+
+The recorded runtime commit comes from the preparation installation. Runtime
+downloads can change between phases, so it does not prove that both containers
+used that commit.
 
 ## GitHub Actions
 
-Repository: [razzeee/flathub-health](https://github.com/razzeee/flathub-health).
-After pushing, use **Actions → Flathub health → Run workflow**.
-The workflow is **manual-only** until a hosted end-to-end run and failure-isolation
-check succeed. No hosted run has been started or daily schedule enabled.
-After validation, a daily schedule such as `17 5 * * *` can be added (GitHub may
-delay scheduled jobs).
-First publish the missing upstream images, or update `runner.json` and the
-workflow checkout SHA together to a verified published release.
+Open [Actions](https://github.com/razzeee/flathub-health/actions), select
+"Flathub health", and choose "Run workflow". First publish the missing upstream
+images, or update `runner.json` and the workflow checkout SHA to a release with
+available images.
 
-- One fresh Ubuntu 24.04 VM per app; at most two app jobs in parallel.
-- Matrix fail-fast is disabled; each app attempts its recipe even if startup fails.
-- Screenshot image preparation happens separately, after startup testing, so an
-  unavailable optional image cannot suppress startup results.
-- Preparation: individual commands bounded, installation 15 min, image pulls
-  5 min each, bundle export 5 min. Each runner phase has a 5 min internal limit
-  and a 7 min outer limit plus cleanup; each app job is capped at 45 min.
-  The Linux process adapter streams logs and signals the child process group
-  with TERM then KILL on timeout/cancellation, allowing upstream container cleanup.
-- At three apps, app jobs consume at most 135 VM-minutes per run (plus small
-  catalog/report jobs). Daily upper bound is about 4,050 app VM-minutes/month;
-  actual usage should be lower. Downloads and screenshot storage can be large.
-- Result/log/screenshot artifacts and the combined report expire after 14 days.
-- Upload and reporting steps run even after failure. Missing or invalid job
-  artifacts are `incomplete`, never successful. Hard cancellation or a VM loss
-  can still prevent upload; aggregation detects the absent artifact.
-- Workflow permissions are read-only. Checkout credentials are not persisted;
-  there are no secrets, PR triggers, remote issue creation, or gallery publishing.
-  Privileged containers must only run trusted reviewed code on disposable VMs,
-  not on shared/self-hosted machines containing secrets. The report job is separate
-  and does not execute downloaded artifacts.
+Keep the workflow manual-only until a hosted end-to-end run succeeds. Also test
+a failing recipe and confirm that the other apps still upload their artifacts.
+After those checks, add a daily schedule if wanted. `17 5 * * *` requests a run
+at 05:17 UTC. GitHub can delay scheduled jobs.
 
-Startup failures are separated from `recipe_failed`, `infrastructure_failed`
-(including preparation/download failures), and `incomplete`. A stale OCR label
-is not evidence the app is broken. Passing startup does not prove full app
-functionality; screenshots are review evidence, not pixel-diff assertions.
+### Limits
+
+- Each app gets a fresh Ubuntu 24.04 VM. At most two app jobs run at once.
+- Matrix fail-fast is off. A startup failure does not prevent the recipe attempt.
+  The screenshot image is prepared after startup testing, so its absence cannot
+  suppress startup results.
+- Installation has a 15-minute timeout. Each image pull and bundle export has
+  a 5-minute timeout. Other preparation commands have their own timeouts.
+- Each runner phase has a 5-minute internal timeout and a 7-minute outer timeout,
+  followed by a cleanup period. Each app job has a 45-minute limit.
+- Five app jobs can use at most 225 VM-minutes per run, plus the catalog and
+  report jobs. A daily run would use at most about 6,750 app VM-minutes in a
+  30-day month. Downloads and screenshot storage add to that cost.
+- GitHub keeps result artifacts and the combined report for 14 days.
+
+### Failures and permissions
+
+Upload and report steps run after test failures. The reporter marks missing or
+invalid job artifacts as `incomplete`. Cancellation or VM loss can still prevent
+an upload.
+
+The process adapter writes logs as commands run. On timeout or cancellation, it
+sends TERM to the child process group, then KILL if needed. The TERM handler in
+the upstream wrapper gets time to remove its Docker container.
+
+Workflow permissions are read-only, and checkout does not retain credentials.
+The workflow has no secrets or PR triggers. Run privileged containers only on
+disposable VMs with reviewed code. Do not use shared machines that hold secrets.
+The separate report job reads downloaded JSON without executing artifact files.
+
+Reports distinguish startup failures, `recipe_failed`, `infrastructure_failed`,
+and `incomplete`. Preparation and download errors count as infrastructure
+failures. A changed OCR label can break a recipe without breaking the app.
+A startup pass does not test every app function. Review screenshots as evidence;
+the tests do not compare pixels against a reference image.
+
+## Development
+
+Zod validates catalog entries, runner configuration, upstream results, and health
+artifacts. The scripts also check path containment, duplicate app IDs, and
+screenshot files.
+
+Run `pnpm format` to format maintained files. Prettier skips generated outputs,
+the upstream checkout, dependencies, and the lockfile. CI checks formatting and
+installs runtime dependencies in app and report jobs.
+
+We have not added Effect. Actions handles app concurrency, and the local commands
+run in sequence. The [dependency assessment](docs/typescript-dependencies.md)
+records the tradeoffs and when to reconsider it.
 
 ## Adding an app
 
-1. Add a unique stable ID, name, explicit branch and `x86_64` architecture, and
-   documented limitations to `apps.json`. No shell commands or arbitrary fields.
-2. Optionally add `recipes/<app-id>.yml` using the upstream recipe format.
-   Avoid accounts, paid content, and hardware-dependent assertions.
-3. Run catalog validation/tests, then manually test both phases and review captures.
-4. For expansion beyond bootstrap, first record a **dated official Flathub
-   popularity source** and selection rationale. Target 5–10 apps covering GTK,
-   Qt, Electron, and media/document workflows; do not call these three popular
-   without evidence.
+1. Add its stable app ID, name, explicit branch, `x86_64` architecture, and test
+   limitations to `apps.json`. Do not add shell commands or arbitrary fields.
+2. Add `recipes/<app-id>.yml` if it needs a screenshot recipe. Use the upstream
+   recipe format. Avoid accounts, paid content, and hardware-dependent checks.
+3. If the recipe needs sample data, put redistributable files under
+   `fixtures/<app-id>/` and document their license. `setup.files` source paths
+   are relative to the recipe. The initial apps need no fixtures.
+4. Run validation and tests, test both phases manually, and review the captures.
 
-History, a gallery, retry/noise handling, release triggers, and notifications are
-future work described in [PLAN.md](PLAN.md). No listing screenshots or upstream
-issues are automatically published.
+For further additions, record a dated official Flathub source and explain the
+selection in [the catalog notes](docs/catalog-selection.md). Keep the catalog
+small until hosted tests establish its runtime and download costs.
+
+[PLAN.md](PLAN.md) records later work, including history, a gallery, retries,
+release triggers, and notifications. The workflow does not publish listing
+screenshots or file upstream issues.

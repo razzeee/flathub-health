@@ -1,4 +1,4 @@
-/** Resolve one released app and invoke the pinned upstream action. */
+/** Prepare a released app and run the pinned upstream action. */
 import { mkdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { platform, release } from "node:os";
@@ -313,7 +313,7 @@ export async function runApp(
     for (const mode of ["verify", "screenshots"] as const) {
       if (mode === "screenshots" && !app.recipe) continue;
       try {
-        // Optional capture infrastructure must not suppress startup results.
+        // A missing screenshot image must not prevent the startup test.
         const image = config[`${mode}_digest`] ?? (await resolveImage(mode));
         record.phases[mode] = await invokeRunner({
           app,
