@@ -15,11 +15,11 @@ import {
 import {
   digestSchema,
   message,
-  runnerSchema,
   successful,
   upstreamResultSchema,
 } from "./model.ts";
-import type { App, Health, Mode, Outcome, Runner } from "./model.ts";
+import type { App, Health, Mode, Outcome } from "./model.ts";
+import { loadRunner } from "./runner.ts";
 import { command, CommandError } from "./process.ts";
 import type { Executor } from "./process.ts";
 
@@ -29,10 +29,6 @@ const appReasons = new Set([
   "early_exit",
   "app_error_window",
 ]);
-
-export function loadRunner(root: string): Runner {
-  return runnerSchema.parse(readJson(join(root, "runner.json")));
-}
 
 export function classify(
   code: number | null,
@@ -237,16 +233,22 @@ export async function runApp(
           "{{json .RepoDigests}}",
         ]),
       );
+      const repository = image.split("@")[0]!.replace(/:[^/:]+$/, "");
       const digest = digestSchema.safeParse(
-        Array.isArray(digests) ? digests[0] : undefined,
+        Array.isArray(digests)
+          ? digests.find(
+              (value: unknown) =>
+                typeof value === "string" &&
+                value.startsWith(`${repository}@sha256:`),
+            )
+          : undefined,
       );
       if (!digest.success) {
-        throw new Error("image has no immutable repository digest");
+        throw new Error("image has no matching immutable repository digest");
       }
       config[`${mode}_digest`] = digest.data;
       return digest.data;
     };
-    await resolveImage("verify");
     const ref = `app/${app.app_id}/${app.arch}/${app.branch}`;
     await cmd([
       "flatpak",
@@ -313,8 +315,9 @@ export async function runApp(
     for (const mode of ["verify", "screenshots"] as const) {
       if (mode === "screenshots" && !app.recipe) continue;
       try {
-        // A missing screenshot image must not prevent the startup test.
-        const image = config[`${mode}_digest`] ?? (await resolveImage(mode));
+        // Image preparation belongs to its phase, not shared bundle preparation.
+        const image = await resolveImage(mode);
+        save(); // Persist the immutable image before executing upstream code.
         record.phases[mode] = await invokeRunner({
           app,
           mode,

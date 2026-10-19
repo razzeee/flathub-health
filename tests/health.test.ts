@@ -13,13 +13,15 @@ import {
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { test } from "node:test";
+import { parse } from "yaml";
 import { load, matrix } from "../scripts/catalog.ts";
 import { ROOT, readJson, writeJson } from "../scripts/io.ts";
 import type { App, Health } from "../scripts/model.ts";
 import { command, CommandError } from "../scripts/process.ts";
 import type { Executor } from "../scripts/process.ts";
 import { aggregate, render } from "../scripts/report.ts";
-import { classify, invoke, loadRunner, runApp } from "../scripts/run.ts";
+import { classify, invoke, runApp } from "../scripts/run.ts";
+import { loadRunner } from "../scripts/runner.ts";
 
 function temporary(t: { after: (fn: () => void) => void }): string {
   mkdirSync("/tmp/opencode", { recursive: true });
@@ -236,6 +238,54 @@ test("runner configuration schema rejects malformed and unknown fields", (t) => 
   assert.deepEqual(loadRunner(root), config);
 });
 
+test("runner release images and workflow checkout use consistent configuration", async (t) => {
+  const config = loadRunner(ROOT);
+  assert.match(config.version, /^v\d+\.\d+\.\d+$/);
+  assert.equal(
+    config.verify_image,
+    `ghcr.io/razzeee/flatpak-smoke:${config.version}`,
+  );
+  assert.equal(
+    config.screenshots_image,
+    `ghcr.io/razzeee/flatpak-smoke-screenshots:${config.version}`,
+  );
+  const workflow = parse(
+    readFileSync(join(ROOT, ".github/workflows/check-apps.yml"), "utf8"),
+  );
+  const upstream = workflow.jobs.check.steps.find(
+    (step: { with?: { repository?: string } }) =>
+      step.with?.repository === "razzeee/flatpak-smoke",
+  );
+  assert.equal(
+    upstream.with.ref,
+    "${{ needs.catalog.outputs.runner_revision }}",
+  );
+  assert.equal(upstream.with.path, ".runner");
+  assert.equal(workflow.jobs.check.needs, "catalog");
+  assert.equal(
+    workflow.jobs.catalog.outputs.runner_revision,
+    "${{ steps.runner.outputs.revision }}",
+  );
+  const step = workflow.jobs.catalog.steps.find(
+    (step: { id?: string }) => step.id === "runner",
+  );
+  assert.equal(
+    step.run,
+    'revision=$(node scripts/runner.ts)\necho "revision=$revision" >> "$GITHUB_OUTPUT"\n',
+  );
+  const root = temporary(t);
+  const result = await command(
+    [process.execPath, join(ROOT, "scripts/runner.ts")],
+    join(root, "revision.log"),
+  );
+  assert.equal(result.stdout, config.revision);
+  const output = join(root, "github-output");
+  await command(["bash", "-e", "-c", step.run], join(root, "step.log"), {
+    env: { ...process.env, GITHUB_OUTPUT: output },
+  });
+  assert.equal(readFileSync(output, "utf8"), `revision=${config.revision}\n`);
+});
+
 test("upstream schema validates known fields and allows future metadata", () => {
   const passed = {
     schema_version: 1,
@@ -390,7 +440,9 @@ test("failed startup still runs the recipe, with immutable images", async (t) =>
       args.at(-1) === "HEAD"
         ? loadRunner(root).revision
         : args.includes("inspect")
-          ? JSON.stringify([`ghcr.io/example/image@sha256:${"a".repeat(64)}`])
+          ? JSON.stringify([
+              `${args[3]!.split(":")[0]}@sha256:${"a".repeat(64)}`,
+            ])
           : args.includes("--columns=application,version")
             ? `${app().app_id}\t1.0`
             : "example",
@@ -425,7 +477,9 @@ test("unavailable screenshot image preserves completed startup results", async (
         args.at(-1) === "HEAD"
           ? config.revision
           : args.includes("inspect")
-            ? JSON.stringify([`ghcr.io/example/image@sha256:${"a".repeat(64)}`])
+            ? JSON.stringify([
+                `${args[3]!.split(":")[0]}@sha256:${"a".repeat(64)}`,
+              ])
             : args.includes("--columns=application,version")
               ? `${app().app_id}\t1.0`
               : "example",
@@ -446,6 +500,81 @@ test("unavailable screenshot image preserves completed startup results", async (
   const reported = aggregate([app()], join(root, "artifacts"));
   assert.equal(reported[0]!.phases.verify.status, "passed");
   assert.equal(reported[0]!.phases.screenshots.status, "infrastructure_failed");
+});
+
+for (const failure of ["pull", "digest", "invoke"] as const) {
+  test(`startup ${failure} failure does not suppress screenshot preparation`, async (t) => {
+    const root = temporary(t);
+    cpSync(join(ROOT, "runner.json"), join(root, "runner.json"));
+    const config = loadRunner(root);
+    const calls: string[] = [];
+    const execute: Executor = async (args) => {
+      if (args[1] === "pull") {
+        calls.push(args[2]!);
+        if (args[2] === config.verify_image && failure === "pull")
+          throw new Error("startup image unavailable");
+      }
+      const repository = args[3]?.split(":")[0];
+      return {
+        code: 0,
+        stdout:
+          args.at(-1) === "HEAD"
+            ? config.revision
+            : args.includes("inspect")
+              ? JSON.stringify([
+                  `ghcr.io/unrelated/image@sha256:${"b".repeat(64)}`,
+                  ...(args[3] === config.verify_image && failure === "digest"
+                    ? []
+                    : [`${repository}@sha256:${"a".repeat(64)}`]),
+                ])
+              : args.includes("--columns=application,version")
+                ? `${app().app_id}\t1.0`
+                : "example",
+      };
+    };
+    const row = await runApp(app(), root, join(root, "artifacts"), {
+      root,
+      execute,
+      invoke: async ({ mode, image, output }) => {
+        calls.push(mode);
+        const digest = `${config[`${mode}_image`].split(":")[0]}@sha256:${"a".repeat(64)}`;
+        assert.equal(image, digest);
+        const saved = readJson(join(output, "health.json")) as Health;
+        assert.equal(saved.runner[`${mode}_digest`], digest);
+        if (mode === "verify") throw new Error("startup invocation failed");
+        return { status: "passed" };
+      },
+    });
+    assert.deepEqual(calls, [
+      config.verify_image,
+      ...(failure === "invoke" ? ["verify"] : []),
+      config.screenshots_image,
+      "screenshots",
+    ]);
+    assert.equal(row.phases.prepare.status, "passed");
+    assert.equal(row.phases.verify.status, "infrastructure_failed");
+    assert.equal(row.phases.screenshots.status, "passed");
+    assert.equal(
+      aggregate([app()], join(root, "artifacts"))[0]!.phases.screenshots.status,
+      "passed",
+    );
+  });
+}
+
+test("runner checkout mismatch is recorded before any image or app commands", async (t) => {
+  const root = temporary(t);
+  cpSync(join(ROOT, "runner.json"), join(root, "runner.json"));
+  const calls: string[][] = [];
+  const row = await runApp(app(), root, join(root, "artifacts"), {
+    root,
+    execute: async (args) => {
+      calls.push(args);
+      return { code: 0, stdout: "0".repeat(40) };
+    },
+  });
+  assert.deepEqual(calls, [["git", "-C", root, "rev-parse", "HEAD"]]);
+  assert.equal(row.phases.prepare.status, "infrastructure_failed");
+  assert.match(row.phases.prepare.message!, /does not match runner.json/);
 });
 
 test("startup-only apps skip screenshot preparation and report it as not requested", async (t) => {
@@ -469,7 +598,7 @@ test("startup-only apps skip screenshot preparation and report it as not request
             ? config.revision
             : args.includes("inspect")
               ? JSON.stringify([
-                  `ghcr.io/example/image@sha256:${"a".repeat(64)}`,
+                  `${args[3]!.split(":")[0]}@sha256:${"a".repeat(64)}`,
                 ])
               : args.includes("--columns=application,version")
                 ? `${selected.app_id}\t1.0`
@@ -512,7 +641,7 @@ test("upstream action invocation validates ref and real screenshot files", async
   const options = {
     app: app(),
     mode: "verify" as const,
-    image: "image",
+    image: `ghcr.io/razzeee/flatpak-smoke@sha256:${"a".repeat(64)}`,
     bundle: join(root, "app.flatpak"),
     output,
     runner: join(root, ".runner"),
@@ -522,6 +651,10 @@ test("upstream action invocation validates ref and real screenshot files", async
       assert.equal(args[4], "python3");
       assert.equal(opts?.allowFailure, true);
       assert.equal(JSON.parse(opts!.env!.FLATPAK_SMOKE_INPUTS!).user, "nobody");
+      assert.equal(
+        JSON.parse(opts!.env!.FLATPAK_SMOKE_INPUTS!).image,
+        options.image,
+      );
       return { code: 0, stdout: "" };
     }) satisfies Executor,
   };
@@ -548,7 +681,7 @@ test("report keeps failed jobs, identifies missing or corrupt jobs, and includes
   assert.equal(rows[0]!.phases.verify.status, "app_failed");
   assert.equal(rows[1]!.phases.verify.status, "incomplete");
   assert.match(render(rows), /&lt;error&gt;&#124;message/);
-  assert.match(render(rows), /718df5b31ff138dec6b8361ae1eef535667db1cb/);
+  assert.ok(render(rows).includes(loadRunner(ROOT).revision));
   writeFileSync(join(path, "health.json"), "not JSON");
   assert.ok("error" in aggregate(apps, root)[0]!);
   writeJson(join(path, "health.json"), null);

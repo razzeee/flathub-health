@@ -14,11 +14,11 @@ revision in `runner.json`. VLC and LibreOffice add media and document apps with
 startup checks only. They have no screenshot recipes yet. See
 [the selection notes](docs/catalog-selection.md) for sources and test limits.
 
-No end-to-end run has reached app testing. On 2026-10-19, both GHCR images for
-the latest published runner release, `v0.1.1`, returned `manifest unknown`.
-The upstream README's `v0.1.2` examples also require image publication. Local
-runs stopped because Docker denied access to its socket. See the commands and
-results in [docs/validation.md](docs/validation.md).
+No end-to-end health run has reached app testing. On 2026-10-19, the v0.1.2
+source tag and both public GHCR image manifests were verified together and
+pinned in `runner.json`. Earlier local runs stopped because Docker denied
+access to its socket. See the evidence and remaining validation steps in
+[docs/validation.md](docs/validation.md).
 
 The workflow is manual-only. No hosted run has started, and no daily schedule
 is active. These failures tell us nothing about app compatibility yet.
@@ -45,7 +45,8 @@ pnpm format:check
 pnpm check
 pnpm test
 node scripts/catalog.ts
-git clone --branch v0.1.1 --depth 1 https://github.com/razzeee/flatpak-smoke.git .runner
+git clone https://github.com/razzeee/flatpak-smoke.git .runner
+git -C .runner checkout --detach "$(node scripts/runner.ts)"
 node scripts/run.ts --app org.gnome.Calculator
 node scripts/run.ts --app org.kde.kcalc
 node scripts/run.ts --app com.vscodium.codium
@@ -76,6 +77,8 @@ profiles. Each container downloads its runtime.
 
 `runner.json` pins the runner source revision and image release tags. The script
 pulls each image once per job, records its immutable digest, and runs that digest.
+The workflow reads its upstream checkout revision from the same validated config.
+Each digest is saved before invoking the upstream action.
 Reports include the app version, ref, OSTree commit, runtime ref and commit,
 runner revision and image digests, runner environment, and UTC test time.
 Unresolved versions appear as unavailable or unknown.
@@ -87,9 +90,9 @@ used that commit.
 ## GitHub Actions
 
 Open [Actions](https://github.com/razzeee/flathub-health/actions), select
-"Flathub health", and choose "Run workflow". First publish the missing upstream
-images, or update `runner.json` and the workflow checkout SHA to a release with
-available images.
+"Flathub health", and choose "Run workflow". The configured v0.1.2 images have
+public manifests. For future upgrades, update the source revision and both image
+tags together in `runner.json` to a verified release with available images.
 
 Keep the workflow manual-only until a hosted end-to-end run succeeds. Also test
 a failing recipe and confirm that the other apps still upload their artifacts.
@@ -100,8 +103,8 @@ at 05:17 UTC. GitHub can delay scheduled jobs.
 
 - Each app gets a fresh Ubuntu 24.04 VM. At most two app jobs run at once.
 - Matrix fail-fast is off. A startup failure does not prevent the recipe attempt.
-  The screenshot image is prepared after startup testing, so its absence cannot
-  suppress startup results.
+  Each phase prepares its own image after shared bundle preparation. A missing
+  image in either phase cannot suppress the other phase's results.
 - Installation has a 15-minute timeout. Each image pull and bundle export has
   a 5-minute timeout. Other preparation commands have their own timeouts.
 - Each runner phase has a 5-minute internal timeout and a 7-minute outer timeout,

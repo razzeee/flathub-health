@@ -100,17 +100,17 @@ test("app jobs remain manual and depend on successful catalog validation", () =>
   // These checks load the real catalog and fail the prerequisite job before
   // its matrix output step if the catalog is invalid.
   assert.deepEqual(
-    apps.jobs
-      .catalog!.steps.flatMap((step) => (step.run ? [step.run] : []))
-      .slice(0, -1),
+    apps.jobs.catalog!.steps.flatMap((step) => (step.run ? [step.run] : [])),
     [
       "pnpm install --frozen-lockfile",
       "pnpm format:check",
       "pnpm check",
       "pnpm test",
+      'echo "matrix=$(node scripts/catalog.ts)" >> "$GITHUB_OUTPUT"',
+      'revision=$(node scripts/runner.ts)\necho "revision=$revision" >> "$GITHUB_OUTPUT"\n',
     ],
   );
-  const catalog = apps.jobs.catalog!.steps.at(-1)!;
+  const catalog = apps.jobs.catalog!.steps.at(-2)!;
   assert.equal(catalog.id, "catalog");
   assert.match(catalog.run!, /node scripts\/catalog\.ts/);
 });
