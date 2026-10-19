@@ -27,7 +27,8 @@ invoking upstream. These are nonprivileged tests with mocked runner execution.
 
 ## Safe CI checks
 
-`.github/workflows/ci.yml` runs on pull requests and pushes. It installs locked
+`.github/workflows/ci.yml` runs on pull requests and pushes to `main`. Feature
+branch pushes do not trigger a duplicate run alongside the PR check. It installs locked
 dependencies, checks formatting and strict TypeScript, validates the catalog,
 and runs tests. It uses Node 24 from `.node-version` and pnpm 12.6.0 from
 `package.json`. pnpm setup runs before Node setup so the existing pnpm store

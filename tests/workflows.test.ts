@@ -43,7 +43,11 @@ test("PR and push checks only install dependencies and run safe checks", () => {
     "on",
     "permissions",
   ]);
-  assert.deepEqual(ci.on, { pull_request: null, push: null });
+  // Feature branches are checked through pull_request, not a second push run.
+  assert.deepEqual(ci.on, {
+    pull_request: null,
+    push: { branches: ["main"] },
+  });
   assert.deepEqual(ci.permissions, { contents: "read" });
   assert.deepEqual(Object.keys(ci.jobs), ["checks"]);
   const checks = ci.jobs.checks!;
