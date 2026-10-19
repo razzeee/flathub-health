@@ -14,11 +14,50 @@ pnpm test
 node scripts/catalog.ts
 ```
 
-All 18 tests pass. They cover catalog validation, failure classification,
+All 22 tests pass. They cover catalog validation, failure classification,
 timeouts, process-group cleanup, cancellation, logs, path containment, and
 reporting with failed or missing artifacts. They also verify that a missing
 screenshot image preserves startup results and that apps without recipes skip
 screenshot preparation. The matrix contains five apps.
+
+## Safe CI checks
+
+`.github/workflows/ci.yml` runs on pull requests and pushes. It installs locked
+dependencies, checks formatting and strict TypeScript, validates the catalog,
+and runs tests. It uses Node 24 from `.node-version` and pnpm 12.6.0 from
+`package.json`. pnpm setup runs before Node setup so the existing pnpm store
+cache behavior is preserved.
+
+The workflow requests only `contents: read` and does not retain checkout
+credentials. It references no secrets and runs no Docker, Flatpak, app jobs,
+privileged containers, or publishing steps. The app workflow remains manual-only
+with its existing catalog prerequisite. No schedule is enabled.
+
+Workflow regression tests parse both YAML files to check triggers, permissions,
+the safe command allowlist, setup and caching, action pins, and the manual app
+job dependency. CLI tests confirm that invalid IDs, duplicate entries, escaped
+recipe paths, and unknown catalog fields return exit code 1 with no matrix on
+stdout. A valid fixture must still produce a matrix. The tests use temporary
+catalogs and mocked app execution, not privileged app runs.
+
+On 2026-10-19, action pins were checked against release tags and commit objects
+in their upstream GitHub repositories. The commits were GitHub-verified, and
+their action definitions were reviewed for the inputs and runtimes used here:
+
+- `actions/checkout` v4.4.0
+- `pnpm/action-setup` v4.4.0
+- `actions/setup-node` v4.4.0
+- `actions/upload-artifact` v4.6.2
+- `actions/download-artifact` v4.3.0
+
+Both workflows use full commit SHAs with release comments. The pnpm v4 major
+tag resolved to a different commit, so its v4.4.0 release commit was used rather
+than assuming the major tag was the release commit.
+
+Local validation uses Node 24.22.0 and pnpm 12.6.0. The commands above and
+actionlint 1.7.12 validate the safe checks without starting a hosted workflow.
+PR check delivery still needs confirmation after these changes are published;
+no privileged app run was performed for this change.
 
 ## End-to-end blockers
 
