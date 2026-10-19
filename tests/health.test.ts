@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import {
   cpSync,
   existsSync,
@@ -140,6 +141,38 @@ test("catalog rejects recipe symlink escapes", (t) => {
     apps: [{ ...app(), recipe: "recipes/escape.yml" }],
   });
   assert.throws(() => load(join(root, "apps.json")));
+});
+
+test("catalog CLI fails invalid inputs without emitting an app matrix", (t) => {
+  const root = temporary(t);
+  const path = join(root, "apps.json");
+  cpSync(join(ROOT, "recipes"), join(root, "recipes"), { recursive: true });
+  for (const value of [
+    { schema_version: 1, apps: [{ ...app(), app_id: "../../bad" }] },
+    { schema_version: 1, apps: [app(), app()] },
+    { schema_version: 1, apps: [{ ...app(), recipe: "../outside.yml" }] },
+    { schema_version: 1, apps: [{ ...app(), command: "sh" }] },
+  ]) {
+    writeJson(path, value);
+    const result = spawnSync(
+      process.execPath,
+      ["scripts/catalog.ts", "--catalog", path],
+      { cwd: ROOT, encoding: "utf8" },
+    );
+    assert.ifError(result.error);
+    assert.equal(result.status, 1);
+    assert.equal(result.stdout, "");
+    assert.notEqual(result.stderr, "");
+  }
+  writeJson(path, { schema_version: 1, apps: [app()] });
+  const valid = spawnSync(
+    process.execPath,
+    ["scripts/catalog.ts", "--catalog", path],
+    { cwd: ROOT, encoding: "utf8" },
+  );
+  assert.ifError(valid.error);
+  assert.equal(valid.status, 0);
+  assert.deepEqual(JSON.parse(valid.stdout), matrix([app()]));
 });
 
 test("runner exits and failure classifications remain separate", () => {

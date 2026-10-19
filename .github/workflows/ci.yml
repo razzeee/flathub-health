@@ -1,0 +1,31 @@
+name: CI
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Safe checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Check formatting
+        run: pnpm format:check
+      - name: Check strict TypeScript
+        run: pnpm check
+      - name: Validate catalog
+        run: pnpm catalog
+      - name: Run tests
+        run: pnpm test
