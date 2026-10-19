@@ -1,0 +1,111 @@
+name: Flathub health
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flathub-health
+  cancel-in-progress: false
+
+jobs:
+  catalog:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.catalog.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm check
+      - run: pnpm test
+      - id: catalog
+        run: echo "matrix=$(node scripts/catalog.ts)" >> "$GITHUB_OUTPUT"
+
+  check:
+    needs: catalog
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix: ${{ fromJSON(needs.catalog.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: razzeee/flatpak-smoke
+          ref: 718df5b31ff138dec6b8361ae1eef535667db1cb # v0.1.1; keep runner.json in sync
+          path: .runner
+          persist-credentials: false
+      - name: Install Flatpak tooling
+        run: sudo apt-get update && sudo apt-get install -y flatpak
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --prod --frozen-lockfile
+      - name: Check released app and capture recipe
+        env:
+          APP_ID: ${{ matrix.app_id }}
+        run: node scripts/run.ts --app "$APP_ID"
+      - name: Upload all diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: health-${{ matrix.app_id }}
+          path: artifacts/${{ matrix.app_id }}/
+          if-no-files-found: error
+          retention-days: 14
+
+  report:
+    if: always()
+    needs: [catalog, check]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --prod --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        continue-on-error: true # aggregator must report missing jobs
+        with:
+          pattern: health-*
+          path: downloads
+      - name: Restore app directory names
+        run: |
+          mkdir -p artifacts
+          for dir in downloads/health-*; do
+            [ -d "$dir" ] || continue
+            mv "$dir" "artifacts/${dir#downloads/health-}"
+          done
+      - name: Aggregate expected jobs
+        run: node scripts/report.ts
+      - name: Job summary
+        if: always()
+        run: cat artifacts/report/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: health-report
+          path: artifacts/report/
+          if-no-files-found: error
+          retention-days: 14

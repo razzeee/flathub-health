@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "apps": [
+    {
+      "app_id": "org.gnome.Calculator",
+      "name": "Calculator",
+      "branch": "stable",
+      "arch": "x86_64",
+      "recipe": "recipes/org.gnome.Calculator.yml",
+      "limitations": "GTK bootstrap coverage; startup and arithmetic screenshots only."
+    },
+    {
+      "app_id": "org.kde.kcalc",
+      "name": "KCalc",
+      "branch": "stable",
+      "arch": "x86_64",
+      "recipe": "recipes/org.kde.kcalc.yml",
+      "limitations": "Qt bootstrap coverage; startup and arithmetic screenshots only."
+    },
+    {
+      "app_id": "com.vscodium.codium",
+      "name": "VSCodium",
+      "branch": "stable",
+      "arch": "x86_64",
+      "recipe": "recipes/com.vscodium.codium.yml",
+      "limitations": "Electron bootstrap coverage; getting-started text may change; no extensions or accounts tested."
+    }
+  ]
+}
