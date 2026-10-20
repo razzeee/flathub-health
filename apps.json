@@ -30,7 +30,8 @@
       "name": "VLC",
       "branch": "stable",
       "arch": "x86_64",
-      "limitations": "Tests startup only. No screenshot recipe yet. It does not test media playback, codecs, audio output, or hardware acceleration. First-run dialogs may affect startup results."
+      "recipe": "recipes/org.videolan.VLC.yml",
+      "limitations": "Opens and captures a short silent CC0 test video in a clean profile. This checks that VLC opens a media file and presents video, but does not prove audio output, codec support beyond this fixture, hardware acceleration, or general playback compatibility. It uses no account or audio-device assertions."
     },
     {
       "app_id": "org.libreoffice.LibreOffice",

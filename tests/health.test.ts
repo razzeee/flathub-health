@@ -577,11 +577,11 @@ test("runner checkout mismatch is recorded before any image or app commands", as
   assert.match(row.phases.prepare.message!, /does not match runner.json/);
 });
 
-test("startup-only apps skip screenshot preparation and report it as not requested", async (t) => {
+test("apps without recipes skip screenshot preparation and report it as not requested", async (t) => {
   const apps = load().filter((app) => !app.recipe);
   assert.deepEqual(
     apps.map(({ app_id }) => app_id),
-    ["org.videolan.VLC", "org.libreoffice.LibreOffice"],
+    ["org.libreoffice.LibreOffice"],
   );
   for (const selected of apps) {
     const root = temporary(t);
