@@ -5,11 +5,11 @@ window:
 steps:
   - capture:
       name: overview
-      caption: Calculator is ready for input.
+      caption: Calculator is ready for input
   - key: "2"
   - key: plus
   - key: "2"
   - key: Return
   - capture:
       name: calculation
-      caption: Calculator shows the result of 2 + 2.
+      caption: Calculator shows the result of 2 + 2

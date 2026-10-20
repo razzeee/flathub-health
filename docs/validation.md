@@ -1,6 +1,7 @@
 # Validation
 
-Last checked on 2026-10-19. No end-to-end run has reached app testing.
+Last checked on 2026-10-20. The first hosted run reached app testing and saved
+diagnostics for all five apps. Recipe capture still needs a successful rerun.
 
 ## Passing checks
 
@@ -14,7 +15,7 @@ pnpm test
 node scripts/catalog.ts
 ```
 
-All 27 tests pass with Node 24.22.0 and pnpm 12.6.0. They cover catalog validation, failure classification,
+All 32 tests pass with Node 24.22.0 and pnpm 12.6.0. They cover catalog validation, failure classification,
 timeouts, process-group cleanup, cancellation, logs, path containment, and
 reporting with failed or missing artifacts. They also verify that a missing
 screenshot image preserves startup results and that apps without recipes skip
@@ -116,25 +117,45 @@ The old v0.1.1 images still return `manifest unknown`. That historical publicati
 blocker is avoided by using the verified v0.1.2 tag and images. No images were
 built or published and no upstream files were changed in this worktree.
 
-## Remaining end-to-end validation
+## First hosted run
 
-Previously recorded local runs for Calculator, KCalc, and VSCodium stopped at `docker info` because
-Docker denied access to `unix:///var/run/docker.sock`. Each saved preparation
-logs and an `infrastructure_failed` result under `artifacts/`. Startup and
-recipe phases remained `incomplete`. VLC and LibreOffice have not run yet.
+The [manual run on 2026-10-20](https://github.com/razzeee/flathub-health/actions/runs/39388899704)
+tested `v0.1.2` at revision `7b4e5db4c134098f41fd7b21b0eaa606a970580f`.
+All five preparations passed. Calculator, KCalc, VSCodium, and LibreOffice passed
+startup checks, and their captures show the app windows. VLC returned
+`early_exit` without opening a GUI.
 
-Those earlier attempts produced no app versions, screenshots, or compatibility
-results. No privileged app runs or hosted workflows were started for issue #2.
-Its end-to-end completion check still requires a user-requested manual workflow
-run that pulls both images and produces health artifacts with execution digests.
+All three recipe runs failed before capture with the same parser error:
+
+```text
+caption must be a single line without a trailing full stop
+```
+
+The captions now omit trailing periods. Tests load every catalog recipe and
+check that captions follow this rule, including nonempty single-line text.
+The tests do not replace upstream validation of other recipe actions. These
+changes still need a hosted run to prove capture succeeds.
+
+VLC's logs show `no suitable interface module`, a failed `skins2` interface,
+and a fallback to the command-line interface before shutdown. They also show a
+refused PulseAudio connection. These messages do not establish which condition
+prevented its GUI from starting. Local Docker access is still denied, so this
+environment cannot reproduce that launch independently. Keep this result as
+an observed compatibility failure, not proof that the app is generally broken.
+
+All five app artifacts and the combined report uploaded. The report job returned
+exit code 1 because it contained failed phases, not because aggregation crashed.
+No app artifacts were missing. The run recorded app refs, versions, commits,
+runtime metadata, and the image digests it executed.
 
 ## Before enabling daily runs
 
-1. Provide Docker access on a disposable runner. Upstream v0.1.2 publication and
-   both public image manifests have been verified, but local pulls and app runs
-   have not been performed as part of this change.
-2. Run the manual GitHub workflow for all five apps. Review startup results and
-   screenshots for the three apps with recipes.
+1. Rerun the corrected recipes on a disposable hosted runner and review their
+   captures. Keep issue #3 open until at least one full recipe succeeds and all
+   five apps have documented outcomes.
+2. Investigate VLC's GUI startup in the same headless environment. Track generic
+   display or runner capability changes in flatpak-smoke rather than adding
+   desktop automation here.
 3. Break one recipe and confirm that other jobs still upload their artifacts
    and the report identifies the failure.
 

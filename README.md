@@ -14,14 +14,16 @@ revision in `runner.json`. VLC and LibreOffice add media and document apps with
 startup checks only. They have no screenshot recipes yet. See
 [the selection notes](docs/catalog-selection.md) for sources and test limits.
 
-No end-to-end health run has reached app testing. On 2026-10-19, the v0.1.2
-source tag and both public GHCR image manifests were verified together and
-pinned in `runner.json`. Earlier local runs stopped because Docker denied
-access to its socket. See the evidence and remaining validation steps in
-[docs/validation.md](docs/validation.md).
+The [first hosted run](https://github.com/razzeee/flathub-health/actions/runs/39388899704)
+on 2026-10-20 passed startup checks for Calculator, KCalc, VSCodium, and
+LibreOffice. VLC exited without opening a GUI. All three screenshot recipes
+stopped at parsing because their captions ended in periods. The captions are
+now corrected, with regression checks, but hosted capture still needs a rerun.
+See [docs/validation.md](docs/validation.md) for the evidence and remaining checks.
 
-The workflow is manual-only. No hosted run has started, and no daily schedule
-is active. These failures tell us nothing about app compatibility yet.
+The workflow is manual-only. No daily schedule is active. A startup pass does
+not prove that all app functions work, and VLC's result still needs diagnosis
+in the test environment.
 
 ## Setup
 
@@ -154,6 +156,8 @@ built-in process handling and test runner cover the current needs without Effect
    limitations to `apps.json`. Do not add shell commands or arbitrary fields.
 2. Add `recipes/<app-id>.yml` if it needs a screenshot recipe. Use the upstream
    recipe format. Avoid accounts, paid content, and hardware-dependent checks.
+   Captions must be nonempty single lines without trailing periods. `pnpm test`
+   checks every catalog recipe against these caption rules.
 3. If the recipe needs sample data, put redistributable files under
    `fixtures/<app-id>/` and document their license. `setup.files` source paths
    are relative to the recipe. The initial apps need no fixtures.
