@@ -126,7 +126,7 @@ test("LibreOffice recipe seeds and opens the licensed sample document", () => {
 
   assert.deepEqual(recipe.setup.files, [
     {
-      source: "../fixtures/org.libreoffice.LibreOffice/sample.odt",
+      source: "fixtures/org.libreoffice.LibreOffice/sample.odt",
       destination: "data/documents/sample.odt",
     },
   ]);
@@ -139,7 +139,10 @@ test("LibreOffice recipe seeds and opens the licensed sample document", () => {
     recipe.steps.some((step) => step.capture?.name === "sample-document"),
   );
 
-  const fixture = join(ROOT, "fixtures/org.libreoffice.LibreOffice/sample.odt");
+  const fixture = join(
+    ROOT,
+    "recipes/fixtures/org.libreoffice.LibreOffice/sample.odt",
+  );
   assert.ok(statSync(fixture).size > 0);
   const odt = readFileSync(fixture);
   assert.equal(odt.subarray(0, 2).toString(), "PK");
@@ -148,7 +151,7 @@ test("LibreOffice recipe seeds and opens the licensed sample document", () => {
   );
   assert.match(
     readFileSync(
-      join(ROOT, "fixtures/org.libreoffice.LibreOffice/LICENSE.txt"),
+      join(ROOT, "recipes/fixtures/org.libreoffice.LibreOffice/LICENSE.txt"),
       "utf8",
     ),
     /CC0 1\.0/,
