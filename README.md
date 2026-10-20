@@ -10,8 +10,8 @@ the results. It does not rebuild app manifests.
 
 The catalog has five apps. Calculator, KCalc, and VSCodium cover GTK, Qt, and
 Electron. Their recipes come from flatpak-smoke's `tests/compatibility/` at the
-revision in `runner.json`. VLC now opens a short, silent CC0 test video from a
-clean profile; LibreOffice remains startup-only. See
+revision in `runner.json`. VLC opens a short, silent CC0 test video and
+LibreOffice opens a bundled CC0 Writer document from a clean profile. See
 [the selection notes](docs/catalog-selection.md) for sources and test limits.
 
 The latest successful hosted run

@@ -4,7 +4,7 @@ window:
   height: 650
 setup:
   files:
-    - source: ../fixtures/org.libreoffice.LibreOffice/sample.odt
+    - source: fixtures/org.libreoffice.LibreOffice/sample.odt
       destination: data/documents/sample.odt
 launch:
   args:
