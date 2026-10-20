@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { parseDocument } from "yaml";
@@ -79,5 +79,64 @@ test("VLC recipe seeds and opens its redistributable media fixture", () => {
     ).includes("CC0 1.0"),
     true,
     "fixture source and license must be documented",
+  );
+});
+
+test("LibreOffice recipe seeds and opens the licensed sample document", () => {
+  const app = load().find(
+    ({ app_id }) => app_id === "org.libreoffice.LibreOffice",
+  );
+  assert.ok(app?.recipe);
+  const parsed = parseDocument(readFileSync(join(ROOT, app.recipe), "utf8"), {
+    uniqueKeys: true,
+  });
+  assert.deepEqual(parsed.errors, []);
+  const recipe = z
+    .object({
+      setup: z.object({
+        files: z.array(
+          z.object({ source: z.string(), destination: z.string() }),
+        ),
+      }),
+      launch: z.object({ args: z.array(z.string()) }),
+      steps: z.array(
+        z.object({
+          wait_text: z.string().optional(),
+          capture: z
+            .object({ name: z.string(), caption: z.string() })
+            .optional(),
+        }),
+      ),
+    })
+    .parse(parsed.toJS());
+
+  assert.deepEqual(recipe.setup.files, [
+    {
+      source: "../fixtures/org.libreoffice.LibreOffice/sample.odt",
+      destination: "data/documents/sample.odt",
+    },
+  ]);
+  assert.deepEqual(recipe.launch.args, [
+    "--writer",
+    "${APP_DATA}/documents/sample.odt",
+  ]);
+  assert.ok(recipe.steps.some((step) => step.wait_text === "A small garden"));
+  assert.ok(
+    recipe.steps.some((step) => step.capture?.name === "sample-document"),
+  );
+
+  const fixture = join(ROOT, "fixtures/org.libreoffice.LibreOffice/sample.odt");
+  assert.ok(statSync(fixture).size > 0);
+  const odt = readFileSync(fixture);
+  assert.equal(odt.subarray(0, 2).toString(), "PK");
+  assert.ok(
+    odt.includes(Buffer.from("application/vnd.oasis.opendocument.text")),
+  );
+  assert.match(
+    readFileSync(
+      join(ROOT, "fixtures/org.libreoffice.LibreOffice/LICENSE.txt"),
+      "utf8",
+    ),
+    /CC0 1\.0/,
   );
 });

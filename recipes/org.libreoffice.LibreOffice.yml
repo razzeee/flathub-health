@@ -1,0 +1,18 @@
+version: 1
+window:
+  width: 900
+  height: 650
+setup:
+  files:
+    - source: ../fixtures/org.libreoffice.LibreOffice/sample.odt
+      destination: data/documents/sample.odt
+launch:
+  args:
+    - --writer
+    - ${APP_DATA}/documents/sample.odt
+steps:
+  - wait_text: A small garden
+    timeout: 60s
+  - capture:
+      name: sample-document
+      caption: LibreOffice Writer opens the included sample document
