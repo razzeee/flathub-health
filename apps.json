@@ -38,7 +38,8 @@
       "name": "LibreOffice",
       "branch": "stable",
       "arch": "x86_64",
-      "limitations": "Tests startup only. No screenshot recipe yet. It does not open, edit, or export documents. A visible start center does not prove that the office tools work."
+      "recipe": "recipes/org.libreoffice.LibreOffice.yml",
+      "limitations": "Opens a bundled CC0 sample document in Writer and captures it. Does not test editing, saving, exporting, or compatibility with other file formats."
     }
   ]
 }

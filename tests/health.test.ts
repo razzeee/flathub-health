@@ -578,10 +578,11 @@ test("runner checkout mismatch is recorded before any image or app commands", as
 });
 
 test("apps without recipes skip screenshot preparation and report it as not requested", async (t) => {
-  const apps = load().filter((app) => !app.recipe);
+  const { recipe: _recipe, ...startupOnly } = load()[0]!;
+  const apps = [startupOnly];
   assert.deepEqual(
     apps.map(({ app_id }) => app_id),
-    ["org.libreoffice.LibreOffice"],
+    [load()[0]!.app_id],
   );
   for (const selected of apps) {
     const root = temporary(t);
