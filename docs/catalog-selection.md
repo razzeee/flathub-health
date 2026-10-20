@@ -26,7 +26,12 @@ The AppStream APIs confirmed the app IDs and refs:
 
 ## Test limits
 
-VLC and LibreOffice have startup checks only, with no screenshot recipes yet.
-Those checks do not test playback, document editing, or file compatibility.
-Neither app has a successful startup result here. See
+VLC has a screenshot recipe that seeds a five-second synthetic CC0 video into
+the clean profile and opens the file directly. Its capture checks that VLC
+opens this media and presents video. It is not evidence for audio output,
+hardware acceleration, broad codec support, or general playback compatibility.
+It uses no account, audio-device, or hardware-acceleration assertions. The
+fixture source, generation command, and license are documented in
+`fixtures/org.videolan.VLC/README.md`. LibreOffice remains startup-only; its
+check does not test document editing or file compatibility. See
 [validation.md](validation.md) for the current run blockers.

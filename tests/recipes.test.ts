@@ -44,3 +44,40 @@ for (const app of load()) {
     );
   });
 }
+
+test("VLC recipe seeds and opens its redistributable media fixture", () => {
+  const recipe = parseDocument(
+    readFileSync(join(ROOT, "recipes/org.videolan.VLC.yml"), "utf8"),
+    { uniqueKeys: true },
+  );
+  assert.deepEqual(recipe.errors, []);
+  const value = recipe.toJS() as {
+    setup: { files: { source: string; destination: string }[] };
+    launch: { args: string[] };
+    steps: { wait_text?: string; capture?: { name: string } }[];
+  };
+  assert.deepEqual(value.setup.files, [
+    {
+      source: "../fixtures/org.videolan.VLC/smoke-test.mp4",
+      destination: "data/VLC-smoke-test.mp4",
+    },
+  ]);
+  assert.deepEqual(value.launch.args, [
+    "--no-one-instance",
+    "--play-and-exit",
+    "${APP_DATA}/VLC-smoke-test.mp4",
+  ]);
+  assert.ok(
+    value.steps.some((step) => step.wait_text === "VLC-smoke-test.mp4"),
+    "wait for the actual media filename rather than the player shell",
+  );
+  assert.ok(value.steps.some((step) => step.capture?.name === "sample-video"));
+  assert.equal(
+    readFileSync(
+      join(ROOT, "fixtures/org.videolan.VLC/README.md"),
+      "utf8",
+    ).includes("CC0 1.0"),
+    true,
+    "fixture source and license must be documented",
+  );
+});

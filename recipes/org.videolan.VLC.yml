@@ -1,0 +1,19 @@
+version: 1
+setup:
+  files:
+    - source: ../fixtures/org.videolan.VLC/smoke-test.mp4
+      destination: data/VLC-smoke-test.mp4
+launch:
+  args:
+    - --no-one-instance
+    - --play-and-exit
+    - "${APP_DATA}/VLC-smoke-test.mp4"
+window:
+  width: 900
+  height: 600
+steps:
+  - wait_text: VLC-smoke-test.mp4
+    timeout: 30s
+  - capture:
+      name: sample-video
+      caption: Play a short silent test video

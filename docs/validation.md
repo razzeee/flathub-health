@@ -167,7 +167,7 @@ timed out during bundle export, before testing; VLC repeated its GUI startup
 failure. Those observations motivated the flatpak-smoke `v0.2.0` update.
 
 The [v0.2.0 hosted run](https://github.com/razzeee/flathub-health/actions/runs/39441598891)
-on 2026-10-20 passed all five apps:
+on 2026-10-20 passed all five apps before VLC's media recipe was added:
 
 - Calculator, KCalc, and VSCodium passed startup and screenshot recipes.
 - VLC and LibreOffice passed startup checks; screenshots were not requested.
@@ -178,6 +178,15 @@ on 2026-10-20 passed all five apps:
 This confirms the new runner resolves the observed VSCodium OCR and VLC startup
 failures in this hosted run. It does not prove all app functionality or establish
 that those failures cannot recur.
+
+The VLC media recipe adds fixture seeding and a capture after waiting for the
+fixture filename. It runs in the screenshot phase's clean profile and opens
+the file rather than only capturing the player shell. The fixture is a
+five-second silent synthetic test pattern dedicated under CC0 1.0. No account,
+audio-device, or hardware-acceleration assertions are made. A successful image
+only demonstrates that this VLC build opened and displayed this fixture; it is
+not a test of audio, general codec support, or hardware acceleration. This
+recipe still needs repeated hosted runs before that stability claim is made.
 
 ## Before enabling daily runs
 
