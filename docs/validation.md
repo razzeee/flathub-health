@@ -10,12 +10,12 @@ the release tag. Both images report that version and revision:
 - Verifier: `sha256:4a779185af4d4addc50bc6cca1f30855c902c25d0f10500b504c127a6651e61d`
 - Screenshots: `sha256:fa0dd990f76ac326131969679e9dae0b1f08a1b53dcc16f77e5c277512d76f5e`
 
-These registry checks do not prove app compatibility. A hosted five-app run with
-this release is still required. The workflow remains manual-only. The results
-below describe earlier runner versions.
+The [hosted run on this release](https://github.com/razzeee/flathub-health/actions/runs/39441598891)
+passed all five apps. The workflow remains manual-only pending failure-isolation
+validation.
 
-Last checked on 2026-10-20. The first hosted run reached app testing and saved
-diagnostics for all five apps. Recipe capture still needs a successful rerun.
+Last checked on 2026-10-20. The latest hosted run reached app testing and saved
+diagnostics for all five apps.
 
 ## Passing checks
 
@@ -131,9 +131,9 @@ The old v0.1.1 images still return `manifest unknown`. That historical publicati
 blocker is avoided by using the verified v0.1.2 tag and images. No images were
 built or published and no upstream files were changed in this worktree.
 
-## First hosted run
+## Hosted validation history
 
-The [manual run on 2026-10-20](https://github.com/razzeee/flathub-health/actions/runs/39388899704)
+The first [manual run on 2026-10-20](https://github.com/razzeee/flathub-health/actions/runs/39388899704)
 tested `v0.1.2` at revision `7b4e5db4c134098f41fd7b21b0eaa606a970580f`.
 All five preparations passed. Calculator, KCalc, VSCodium, and LibreOffice passed
 startup checks, and their captures show the app windows. VLC returned
@@ -145,10 +145,9 @@ All three recipe runs failed before capture with the same parser error:
 caption must be a single line without a trailing full stop
 ```
 
-The captions now omit trailing periods. Tests load every catalog recipe and
+The captions were corrected in PR #19. Tests load every catalog recipe and
 check that captions follow this rule, including nonempty single-line text.
-The tests do not replace upstream validation of other recipe actions. These
-changes still need a hosted run to prove capture succeeds.
+The tests do not replace upstream validation of other recipe actions.
 
 VLC's logs show `no suitable interface module`, a failed `skins2` interface,
 and a fallback to the command-line interface before shutdown. They also show a
@@ -160,18 +159,31 @@ an observed compatibility failure, not proof that the app is generally broken.
 All five app artifacts and the combined report uploaded. The report job returned
 exit code 1 because it contained failed phases, not because aggregation crashed.
 No app artifacts were missing. The run recorded app refs, versions, commits,
-runtime metadata, and the image digests it executed.
+runtime metadata, and image digests.
+
+The later [caption-fix run](https://github.com/razzeee/flathub-health/actions/runs/39395698702)
+passed Calculator and KCalc recipes and startup checks for LibreOffice. VSCodium
+timed out during bundle export, before testing; VLC repeated its GUI startup
+failure. Those observations motivated the flatpak-smoke `v0.2.0` update.
+
+The [v0.2.0 hosted run](https://github.com/razzeee/flathub-health/actions/runs/39441598891)
+on 2026-10-20 passed all five apps:
+
+- Calculator, KCalc, and VSCodium passed startup and screenshot recipes.
+- VLC and LibreOffice passed startup checks; screenshots were not requested.
+- All five app artifacts and the aggregate report completed successfully.
+- Each artifact records runner `v0.2.0`, revision
+  `65fc5d65e02bbf18812d3b9e56ddaa172242e415`, and the executed image digests.
+
+This confirms the new runner resolves the observed VSCodium OCR and VLC startup
+failures in this hosted run. It does not prove all app functionality or establish
+that those failures cannot recur.
 
 ## Before enabling daily runs
 
-1. Rerun the corrected recipes on a disposable hosted runner and review their
-   captures. Keep issue #3 open until at least one full recipe succeeds and all
-   five apps have documented outcomes.
-2. Investigate VLC's GUI startup in the same headless environment. Track generic
-   display or runner capability changes in flatpak-smoke rather than adding
-   desktop automation here.
-3. Break one recipe and confirm that other jobs still upload their artifacts
+1. Break one recipe and confirm that other jobs still upload their artifacts
    and the report identifies the failure.
 
-Keep the workflow manual-only until these checks pass. Unit tests do not prove
-desktop compatibility or hosted CI behavior.
+Keep the workflow manual-only until failure isolation passes. Unit tests do not
+prove that a failed app job leaves other hosted jobs and artifact aggregation
+unaffected.
