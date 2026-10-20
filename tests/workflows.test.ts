@@ -119,23 +119,73 @@ test("app jobs remain manual and depend on successful catalog validation", () =>
   assert.match(catalog.run!, /node scripts\/catalog\.ts/);
 });
 
-test("all third-party workflow actions use the reviewed upstream release commits", () => {
-  const pins: Record<string, string> = {
-    "actions/checkout": "11d5960a326750d5838078e36cf38b85af677262",
-    "pnpm/action-setup": "fc06bc1257f339d1d5d8b3a19a8cae5388b55320",
-    "actions/setup-node": "49933ea5288caeca8642d1e84afbd3f7d6820020",
-    "actions/upload-artifact": "ea165f8d65b6e75b540449e92b4886f43607fa02",
-    "actions/download-artifact": "d3f86a106a0bac45b974a628896c90dbdf5c8093",
-  };
-  for (const file of ["ci.yml", "check-apps.yml"]) {
-    for (const job of Object.values(workflow(file).jobs)) {
+function assertActionPins(workflows: Workflow[]): void {
+  const allowed = new Set([
+    "actions/checkout",
+    "pnpm/action-setup",
+    "actions/setup-node",
+    "actions/upload-artifact",
+    "actions/download-artifact",
+  ]);
+  // Review release commits in the dependency PR. A second SHA list here would
+  // reject every Dependabot update instead of checking the pinning policy.
+  const pins = new Map<string, string>();
+  for (const current of workflows) {
+    for (const job of Object.values(current.jobs)) {
       for (const step of job.steps) {
         if (!step.uses) continue;
+        assert.match(step.uses, /^[^@]+@[a-f0-9]{40}$/);
         const [action, sha] = step.uses.split("@");
-        assert.match(sha!, /^[a-f0-9]{40}$/);
-        assert.ok(action! in pins);
-        assert.equal(sha, pins[action!]);
+        assert.ok(allowed.has(action!), `unexpected action: ${action}`);
+        const previous = pins.get(action!);
+        if (previous !== undefined) {
+          assert.equal(
+            sha,
+            previous,
+            `${action} pins differ between workflows`,
+          );
+        }
+        pins.set(action!, sha!);
       }
     }
   }
+}
+
+function actionWorkflow(...uses: string[]): Workflow {
+  return {
+    on: {},
+    permissions: {},
+    jobs: { fixture: { steps: uses.map((uses) => ({ uses })) } },
+  };
+}
+
+test("all third-party workflow actions use immutable, consistent pins from allowed repositories", () => {
+  assertActionPins([workflow("ci.yml"), workflow("check-apps.yml")]);
+});
+
+test("action release updates can change immutable pins without updating a second version list", () => {
+  const updated = `actions/checkout@${"a".repeat(40)}`;
+  assert.doesNotThrow(() =>
+    assertActionPins([actionWorkflow(updated), actionWorkflow(updated)]),
+  );
+});
+
+test("action pin policy rejects mutable refs, unknown repositories, and version drift", () => {
+  for (const uses of [
+    "actions/checkout@v7.0.1",
+    "actions/checkout@main",
+    "actions/checkout@abc1234",
+    `actions/checkout@v7.0.1@${"a".repeat(40)}`,
+    `unexpected/checkout@${"a".repeat(40)}`,
+  ]) {
+    assert.throws(() => assertActionPins([actionWorkflow(uses)]));
+  }
+  assert.throws(
+    () =>
+      assertActionPins([
+        actionWorkflow(`actions/checkout@${"a".repeat(40)}`),
+        actionWorkflow(`actions/checkout@${"b".repeat(40)}`),
+      ]),
+    /pins differ/,
+  );
 });
