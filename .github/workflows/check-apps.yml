@@ -15,6 +15,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       matrix: ${{ steps.catalog.outputs.matrix }}
+      runner_revision: ${{ steps.runner.outputs.revision }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -30,6 +31,10 @@ jobs:
       - run: pnpm test
       - id: catalog
         run: echo "matrix=$(node scripts/catalog.ts)" >> "$GITHUB_OUTPUT"
+      - id: runner
+        run: |
+          revision=$(node scripts/runner.ts)
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
 
   check:
     needs: catalog
@@ -46,7 +51,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           repository: razzeee/flatpak-smoke
-          ref: 718df5b31ff138dec6b8361ae1eef535667db1cb # v0.1.1; keep runner.json in sync
+          ref: ${{ needs.catalog.outputs.runner_revision }}
           path: .runner
           persist-credentials: false
       - name: Install Flatpak tooling
