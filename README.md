@@ -99,6 +99,17 @@ a failing recipe and confirm that the other apps still upload their artifacts.
 After those checks, add a daily schedule if wanted. `17 5 * * *` requests a run
 at 05:17 UTC. GitHub can delay scheduled jobs.
 
+For an explicitly labeled, isolated hosted workflow-fixture run, select
+"Hosted failure-isolation test (opt-in)" and type `RUN HOSTED FAILURE TEST`.
+It is workflow-dispatch-only, uses no app-catalog entries or privileged
+containers, and writes fixture artifacts under separate names; one matrix case
+intentionally omits its artifact. The normal health workflow has no schedule or
+input that can enable one. The test suite separately exercises install failure,
+missing/incomplete report evidence, distinct app/recipe/infrastructure
+classifications, and TERM cancellation/process-group cleanup. A GitHub-hosted
+fixture run validates matrix continuation and artifact handling, not real
+Docker-container cleanup; that remains covered by the safe process tests.
+
 ### Limits
 
 - Each app gets a fresh Ubuntu 24.04 VM. At most two app jobs run at once.
