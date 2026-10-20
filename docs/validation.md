@@ -188,6 +188,8 @@ only demonstrates that this VLC build opened and displayed this fixture; it is
 not a test of audio, general codec support, or hardware acceleration. This
 recipe still needs repeated hosted runs before that stability claim is made.
 
+The first hosted attempt for PR #24 ([run 39445551464](https://github.com/razzeee/flathub-health/actions/runs/39445551464)) passed VLC startup but failed screenshot setup before opening the fixture: flatpak-smoke rejects setup source paths containing `..`. The startup screenshot was only the VLC player shell, not a media capture. The follow-up moves the fixture beneath the recipe directory and adds a regression test requiring a contained, existing source path. Repeated hosted media captures remain required before issue #10 is complete.
+
 ## Before enabling daily runs
 
 1. Break one recipe and confirm that other jobs still upload their artifacts

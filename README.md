@@ -167,13 +167,14 @@ built-in process handling and test runner cover the current needs without Effect
    recipe format. Avoid accounts, paid content, and hardware-dependent checks.
    Captions must be nonempty single lines without trailing periods. `pnpm test`
    checks every catalog recipe against these caption rules.
-3. If the recipe needs sample data, put redistributable files under
-   `fixtures/<app-id>/` and document their source and license. `setup.files`
-   source paths are relative to the recipe. The VLC test video is synthetic,
-   silent, and CC0; its playback screenshot does not establish audio output,
-   general codec compatibility, or hardware acceleration. LibreOffice's
-   bundled Writer document is also CC0 1.0; its recipe seeds it into the clean
-   profile and opens it directly rather than relying on the start center.
+3. If the recipe needs sample data, keep redistributable files beneath its
+   recipe directory and document their source and license. flatpak-smoke rejects
+   `setup.files` paths that traverse above the recipe directory. The VLC test
+   video is synthetic, silent, and CC0; its playback screenshot does not
+   establish audio output, general codec compatibility, or hardware acceleration.
+   LibreOffice's bundled Writer document is also CC0 1.0; its recipe seeds it
+   into the clean profile and opens it directly rather than relying on the start
+   center.
 4. Run validation and tests, test both phases manually, and review the captures.
 
 For further additions, record a dated official Flathub source and explain the

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { dirname, resolve, sep } from "node:path";
 import { test } from "node:test";
 import { parseDocument } from "yaml";
 import { z } from "zod";
@@ -56,9 +57,22 @@ test("VLC recipe seeds and opens its redistributable media fixture", () => {
     launch: { args: string[] };
     steps: { wait_text?: string; capture?: { name: string } }[];
   };
+  const recipePath = join(ROOT, "recipes/org.videolan.VLC.yml");
+  const source = value.setup.files[0]!.source;
+  assert.ok(
+    !source.split(/[\\/]/).includes(".."),
+    "source cannot traverse above the recipe directory",
+  );
+  assert.ok(
+    resolve(dirname(recipePath), source).startsWith(
+      `${join(ROOT, "recipes")}${sep}`,
+    ),
+    "source must remain within the recipes tree",
+  );
+  readFileSync(resolve(dirname(recipePath), source));
   assert.deepEqual(value.setup.files, [
     {
-      source: "../fixtures/org.videolan.VLC/smoke-test.mp4",
+      source: "fixtures/org.videolan.VLC/smoke-test.mp4",
       destination: "data/VLC-smoke-test.mp4",
     },
   ]);
@@ -74,7 +88,7 @@ test("VLC recipe seeds and opens its redistributable media fixture", () => {
   assert.ok(value.steps.some((step) => step.capture?.name === "sample-video"));
   assert.equal(
     readFileSync(
-      join(ROOT, "fixtures/org.videolan.VLC/README.md"),
+      join(ROOT, "recipes/fixtures/org.videolan.VLC/README.md"),
       "utf8",
     ).includes("CC0 1.0"),
     true,
