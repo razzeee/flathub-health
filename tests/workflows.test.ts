@@ -120,6 +120,40 @@ test("app jobs remain manual and depend on successful catalog validation", () =>
   assert.match(catalog.run!, /node scripts\/catalog\.ts/);
 });
 
+test("hosted failure fixtures require explicit confirmation and stay outside the app catalog", () => {
+  const fixture = workflow("test-failure-isolation.yml");
+  assert.deepEqual(Object.keys(fixture.on), ["workflow_dispatch"]);
+  const input = (
+    fixture.on.workflow_dispatch as {
+      inputs: Record<string, { required: boolean }>;
+    }
+  ).inputs;
+  assert.equal(input.confirm!.required, true);
+  assert.deepEqual(Object.keys(fixture.jobs), [
+    "hosted-fixtures",
+    "verify-fixtures",
+  ]);
+  assert.equal(
+    fixture.jobs["hosted-fixtures"]!.if,
+    "${{ inputs.confirm == 'RUN HOSTED FAILURE TEST' }}",
+  );
+  assert.equal(
+    fixture.jobs["hosted-fixtures"]!.strategy &&
+      (fixture.jobs["hosted-fixtures"]!.strategy as { "fail-fast": boolean })[
+        "fail-fast"
+      ],
+    false,
+  );
+  const steps = fixture.jobs["hosted-fixtures"]!.steps;
+  assert.ok(steps.some((step) => step.name?.includes("fixture evidence")));
+  assert.ok(steps.every((step) => !step.run?.includes("scripts/run.ts")));
+  assert.equal(
+    fixture.jobs["verify-fixtures"]!.if,
+    "${{ always() && inputs.confirm == 'RUN HOSTED FAILURE TEST' }}",
+  );
+  assertActionPins([fixture]);
+});
+
 function assertActionPins(workflows: Workflow[]): void {
   const allowed = new Set([
     "actions/checkout",
@@ -161,7 +195,11 @@ function actionWorkflow(...uses: string[]): Workflow {
 }
 
 test("all third-party workflow actions use immutable, consistent pins from allowed repositories", () => {
-  assertActionPins([workflow("ci.yml"), workflow("check-apps.yml")]);
+  assertActionPins([
+    workflow("ci.yml"),
+    workflow("check-apps.yml"),
+    workflow("test-failure-isolation.yml"),
+  ]);
 });
 
 test("action release updates can change immutable pins without updating a second version list", () => {
