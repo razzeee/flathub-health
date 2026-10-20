@@ -84,6 +84,7 @@ test("PR and push checks only install dependencies and run safe checks", () => {
     readFileSync(join(ROOT, "tsconfig.json"), "utf8"),
   );
   assert.equal(compiler.compilerOptions.strict, true);
+  assert.deepEqual(compiler.compilerOptions.types, ["node"]);
   assert.equal(readFileSync(join(ROOT, ".node-version"), "utf8").trim(), "24");
   const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
   assert.equal(pkg.packageManager, "pnpm@12.6.0");
