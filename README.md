@@ -14,16 +14,14 @@ revision in `runner.json`. VLC and LibreOffice add media and document apps with
 startup checks only. They have no screenshot recipes yet. See
 [the selection notes](docs/catalog-selection.md) for sources and test limits.
 
-The [first hosted run](https://github.com/razzeee/flathub-health/actions/runs/39388899704)
-on 2026-10-20 passed startup checks for Calculator, KCalc, VSCodium, and
-LibreOffice. VLC exited without opening a GUI. All three screenshot recipes
-stopped at parsing because their captions ended in periods. The captions are
-now corrected, with regression checks, but hosted capture still needs a rerun.
-See [docs/validation.md](docs/validation.md) for the evidence and remaining checks.
+The [latest hosted run](https://github.com/razzeee/flathub-health/actions/runs/39441598891)
+passed all five apps using flatpak-smoke `v0.2.0`: the three recipes passed
+startup and capture, and VLC and LibreOffice passed startup checks. See
+[docs/validation.md](docs/validation.md) for the run history and remaining check.
 
 The workflow is manual-only. No daily schedule is active. A startup pass does
-not prove that all app functions work, and VLC's result still needs diagnosis
-in the test environment.
+not prove that all app functions work. Failure isolation still needs hosted
+validation before scheduling is considered.
 
 ## Setup
 
