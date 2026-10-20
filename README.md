@@ -14,8 +14,9 @@ revision in `runner.json`. VLC now opens a short, silent CC0 test video from a
 clean profile; LibreOffice remains startup-only. See
 [the selection notes](docs/catalog-selection.md) for sources and test limits.
 
-The [latest hosted run](https://github.com/razzeee/flathub-health/actions/runs/39441598891)
-passed all five apps using flatpak-smoke `v0.2.0`: the three recipes passed
+The latest successful hosted run
+([39441598891](https://github.com/razzeee/flathub-health/actions/runs/39441598891))
+is historical evidence for flatpak-smoke `v0.2.0`: the three recipes passed
 startup and capture, and VLC and LibreOffice passed startup checks. See
 [docs/validation.md](docs/validation.md) for the run history and remaining check.
 
@@ -90,8 +91,9 @@ used that commit.
 ## GitHub Actions
 
 Open [Actions](https://github.com/razzeee/flathub-health/actions), select
-"Flathub health", and choose "Run workflow". The configured v0.2.0 images have
-public manifests. For future upgrades, update the source revision and both image
+"Flathub health", and choose "Run workflow". The configured v0.3.0 images have
+public manifests. Hosted app validation is pending.
+For future upgrades, update the source revision and both image
 tags together in `runner.json` to a verified release with available images.
 
 Keep the workflow manual-only until a hosted end-to-end run succeeds. Also test

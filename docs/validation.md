@@ -2,20 +2,23 @@
 
 ## Current runner pin
 
-`runner.json` pins flatpak-smoke `v0.2.0` at
-`65fc5d65e02bbf18812d3b9e56ddaa172242e415`. On 2026-10-20, both public
+`runner.json` pins flatpak-smoke `v0.3.0` at
+`c7f40d5f6e89397d0dbf9e0f23d1a3a67a1dc1d0`. On 2026-10-20, both public
 Linux amd64 image manifests and their configuration labels were checked against
 the release tag. Both images report that version and revision:
 
-- Verifier: `sha256:4a779185af4d4addc50bc6cca1f30855c902c25d0f10500b504c127a6651e61d`
-- Screenshots: `sha256:fa0dd990f76ac326131969679e9dae0b1f08a1b53dcc16f77e5c277512d76f5e`
+- Verifier: `sha256:fe076ca92b8efebc87a6c3a22b77b7357cad0a8e7b2ac26982023e822902ad8d`
+- Screenshots: `sha256:293706f391c60e1aa1df529cc35ae875c33f2fc294e8fef8910b40cdba0a4320`
 
-The [hosted run on this release](https://github.com/razzeee/flathub-health/actions/runs/39441598891)
-passed all five apps. The workflow remains manual-only pending failure-isolation
-validation.
+Hosted app validation of v0.3.0 is pending. The workflow remains manual-only
+pending failure-isolation validation.
 
-Last checked on 2026-10-20. The latest hosted run reached app testing and saved
-diagnostics for all five apps.
+The previous pin, v0.2.0 at `65fc5d65e02bbf18812d3b9e56ddaa172242e415`, had a
+successful hosted run on all five apps:
+[39441598891](https://github.com/razzeee/flathub-health/actions/runs/39441598891).
+
+Last checked on 2026-10-20. v0.3.0 image provenance was verified; its hosted app
+validation has not yet run.
 
 ## Passing checks
 
