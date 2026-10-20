@@ -2,22 +2,22 @@
 
 ## Current runner pin
 
-`runner.json` pins flatpak-smoke `v0.3.0` at
-`c7f40d5f6e89397d0dbf9e0f23d1a3a67a1dc1d0`. On 2026-10-20, both public
+`runner.json` pins flatpak-smoke `v0.4.0` at
+`a84805caeaa4ae5c3deb80d76128c22139f77bf2`. On 2026-10-20, both public
 Linux amd64 image manifests and their configuration labels were checked against
 the release tag. Both images report that version and revision:
 
-- Verifier: `sha256:fe076ca92b8efebc87a6c3a22b77b7357cad0a8e7b2ac26982023e822902ad8d`
-- Screenshots: `sha256:293706f391c60e1aa1df529cc35ae875c33f2fc294e8fef8910b40cdba0a4320`
+- Verifier: `sha256:ffaee733b888837e4d8c1569270bdc65bf875993f9a5c5f7f010e5710041648b`
+- Screenshots: `sha256:7b29b3d7516046720b56be7a96059f30abdf05bfe0e094689ad51bf2ce20753f`
 
-Hosted app validation of v0.3.0 is pending. The workflow remains manual-only
+Hosted app validation of v0.4.0 is pending. The workflow remains manual-only
 pending failure-isolation validation.
 
 The previous pin, v0.2.0 at `65fc5d65e02bbf18812d3b9e56ddaa172242e415`, had a
 successful hosted run on all five apps:
 [39441598891](https://github.com/razzeee/flathub-health/actions/runs/39441598891).
 
-Last checked on 2026-10-20. v0.3.0 image provenance was verified; its hosted app
+Last checked on 2026-10-20. v0.4.0 image provenance was verified; its hosted app
 validation has not yet run.
 
 ## Passing checks
@@ -32,7 +32,7 @@ pnpm test
 node scripts/catalog.ts
 ```
 
-All 32 tests pass with Node 24.22.0 and pnpm 12.6.0. They cover catalog validation, failure classification,
+All 37 tests pass with Node 24.22.0 and pnpm 12.6.0. They cover catalog validation, failure classification,
 timeouts, process-group cleanup, cancellation, logs, path containment, and
 reporting with failed or missing artifacts. They also verify that a missing
 screenshot image preserves startup results and that apps without recipes skip

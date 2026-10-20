@@ -1,6 +1,6 @@
 {
-  "version": "v0.3.0",
-  "revision": "c7f40d5f6e89397d0dbf9e0f23d1a3a67a1dc1d0",
-  "verify_image": "ghcr.io/razzeee/flatpak-smoke:v0.3.0",
-  "screenshots_image": "ghcr.io/razzeee/flatpak-smoke-screenshots:v0.3.0"
+  "version": "v0.4.0",
+  "revision": "a84805caeaa4ae5c3deb80d76128c22139f77bf2",
+  "verify_image": "ghcr.io/razzeee/flatpak-smoke:v0.4.0",
+  "screenshots_image": "ghcr.io/razzeee/flatpak-smoke-screenshots:v0.4.0"
 }

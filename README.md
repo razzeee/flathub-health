@@ -91,7 +91,7 @@ used that commit.
 ## GitHub Actions
 
 Open [Actions](https://github.com/razzeee/flathub-health/actions), select
-"Flathub health", and choose "Run workflow". The configured v0.3.0 images have
+"Flathub health", and choose "Run workflow". The configured v0.4.0 images have
 public manifests. Hosted app validation is pending.
 For future upgrades, update the source revision and both image
 tags together in `runner.json` to a verified release with available images.
