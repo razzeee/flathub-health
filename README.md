@@ -92,7 +92,7 @@ used that commit.
 ## GitHub Actions
 
 Open [Actions](https://github.com/razzeee/flathub-health/actions), select
-"Flathub health", and choose "Run workflow". The configured v0.1.2 images have
+"Flathub health", and choose "Run workflow". The configured v0.2.0 images have
 public manifests. For future upgrades, update the source revision and both image
 tags together in `runner.json` to a verified release with available images.
 
