@@ -1,7 +1,7 @@
 version: 1
 setup:
   files:
-    - source: ../fixtures/org.videolan.VLC/smoke-test.mp4
+    - source: fixtures/org.videolan.VLC/smoke-test.mp4
       destination: data/VLC-smoke-test.mp4
 launch:
   args:

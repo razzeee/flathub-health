@@ -32,6 +32,6 @@ opens this media and presents video. It is not evidence for audio output,
 hardware acceleration, broad codec support, or general playback compatibility.
 It uses no account, audio-device, or hardware-acceleration assertions. The
 fixture source, generation command, and license are documented in
-`fixtures/org.videolan.VLC/README.md`. LibreOffice remains startup-only; its
+`recipes/fixtures/org.videolan.VLC/README.md`. LibreOffice remains startup-only; its
 check does not test document editing or file compatibility. See
 [validation.md](validation.md) for the current run blockers.
