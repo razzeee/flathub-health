@@ -5,7 +5,6 @@ setup:
       destination: data/VLC-smoke-test.mp4
 launch:
   args:
-    - --intf=qt
     - --no-one-instance
     - --play-and-exit
     - "${APP_DATA}/VLC-smoke-test.mp4"
