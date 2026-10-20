@@ -4,10 +4,10 @@ steps:
     timeout: 30s
   - capture:
       name: overview
-      caption: Read the Flatpak package's getting-started notes.
+      caption: Read the Flatpak package's getting-started notes
   - key: Ctrl+comma
   - wait_text: Commonly Used
     timeout: 15s
   - capture:
       name: settings
-      caption: Change VSCodium settings.
+      caption: Change VSCodium settings

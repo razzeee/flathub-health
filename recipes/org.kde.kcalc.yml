@@ -2,11 +2,11 @@ version: 1
 steps:
   - capture:
       name: overview
-      caption: KCalc is ready for input.
+      caption: KCalc is ready for input
   - key: "2"
   - key: plus
   - key: "2"
   - key: Return
   - capture:
       name: calculation
-      caption: KCalc shows the result of 2 + 2.
+      caption: KCalc shows the result of 2 + 2
