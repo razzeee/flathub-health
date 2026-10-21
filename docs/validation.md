@@ -2,23 +2,26 @@
 
 ## Current runner pin
 
-`runner.json` pins flatpak-smoke `v0.4.0` at
-`a84805caeaa4ae5c3deb80d76128c22139f77bf2`. On 2026-10-20, both public
-Linux amd64 image manifests and their configuration labels were checked against
-the release tag. Both images report that version and revision:
+`runner.json` pins flatpak-smoke `v0.4.1` at
+`fb9c87a451ac97438532aa205dec60fdc6bc5384`. On 2026-10-21, both public
+Linux amd64 immutable image digests are recorded in the release notes:
 
-- Verifier: `sha256:ffaee733b888837e4d8c1569270bdc65bf875993f9a5c5f7f010e5710041648b`
-- Screenshots: `sha256:7b29b3d7516046720b56be7a96059f30abdf05bfe0e094689ad51bf2ce20753f`
+- Verifier: `sha256:8fc25f80df8e1e3a5d133f6546c7db98a2dac6f2e13fbc295272be510dfe2dca`
+- Screenshots: `sha256:c971baec925c1f8a20c63df0adb462a98fa2b4b08df61cfd9a06d8562597e41c`
 
-Hosted app validation of v0.4.0 is pending. The workflow remains manual-only
-pending failure-isolation validation.
+Hosted app validation of v0.4.1 is pending. The upstream release notes report
+that VLC actual-media screenshot completion remains unverified because of
+window-selection/focus failures; this pin does not alter downstream recipes.
+The workflow remains manual-only pending failure-isolation validation.
 
 The previous pin, v0.2.0 at `65fc5d65e02bbf18812d3b9e56ddaa172242e415`, had a
 successful hosted run on all five apps:
 [39441598891](https://github.com/razzeee/flathub-health/actions/runs/39441598891).
 
-Last checked on 2026-10-20. v0.4.0 image provenance was verified; its hosted app
-validation has not yet run.
+Last checked on 2026-10-21. The release tag, source revision, and published
+image manifests were verified; local image configuration-label inspection was
+unavailable because Docker socket access was denied. Hosted app validation has
+not yet run.
 
 ## Passing checks
 
