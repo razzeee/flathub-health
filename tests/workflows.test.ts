@@ -93,7 +93,7 @@ test("PR and push checks only install dependencies and run safe checks", () => {
 test("app jobs remain manual and depend on successful catalog validation", () => {
   const apps = workflow("check-apps.yml");
   assert.deepEqual(apps.on, { workflow_dispatch: null });
-  assert.deepEqual(apps.permissions, { contents: "read" });
+  assert.deepEqual(apps.permissions, { actions: "read", contents: "read" });
   assert.equal(apps.jobs.check!.needs, "catalog");
   assert.equal(apps.jobs.check!.if, undefined);
   assert.equal(apps.jobs.catalog!.if, undefined);
@@ -118,6 +118,24 @@ test("app jobs remain manual and depend on successful catalog validation", () =>
   const catalog = apps.jobs.catalog!.steps.at(-2)!;
   assert.equal(catalog.id, "catalog");
   assert.match(catalog.run!, /node scripts\/catalog\.ts/);
+  const uploads = apps.jobs.check!.steps.filter((step) =>
+    step.uses?.includes("upload-artifact"),
+  );
+  assert.equal(uploads.length, 2);
+  assert.match(String(uploads[0]!.with?.path), /!.*health\.json/);
+  assert.equal(uploads[0]!.with?.["retention-days"], 14);
+  assert.equal(uploads[1]!.with?.["retention-days"], 14);
+  assert.ok(
+    apps.jobs.report!.steps.some((step) =>
+      step.run?.includes("gh run download"),
+    ),
+  );
+  const reportUploads = apps.jobs.report!.steps.filter((step) =>
+    step.uses?.includes("upload-artifact"),
+  );
+  assert.equal(reportUploads.length, 2);
+  assert.equal(reportUploads[1]!.with?.["retention-days"], 14);
+  assert.match(String(reportUploads[1]!.with?.name), /history-/);
 });
 
 test("hosted failure fixtures require explicit confirmation and stay outside the app catalog", () => {

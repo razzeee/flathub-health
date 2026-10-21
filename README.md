@@ -61,10 +61,20 @@ nonzero exit code for failures or incomplete results.
 
 ## Results and repeat runs
 
-Each app writes `artifacts/<app-id>/health.json` and preparation logs. When the
-runner starts, its `verify/` and `screenshots/` directories contain results,
-screenshots, and logs. The reporter writes
-`artifacts/report/{report.json,summary.md}`.
+Each app writes a compact `health.json` result record separately from
+preparation logs and the runner's `verify/` and `screenshots/` results, images,
+and logs. GitHub stores these as separate record and diagnostics artifacts. The
+reporter writes `artifacts/report/{report.json,summary.md}` and a separate
+`history.json` record artifact.
+
+The report compares startup and recipe results independently against the most
+recent retained workflow run, identifies new failures and recoveries, and flags
+environment/version changes. Missing phases or records are unavailable, never
+passes. History records use schema version 1; unsupported schemas are reported,
+and unsupported or malformed records are never interpreted as results. At most 30 prior
+workflow runs are queried, and records and diagnostics use GitHub's existing
+14-day artifact retention. No logs or screenshots are retained in the history
+record artifact.
 
 The scripts refuse to overwrite an existing run. Archive its output, then remove
 only that app's generated `artifacts/<app-id>` and `.health-work/<app-id>`
