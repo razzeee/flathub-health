@@ -187,9 +187,7 @@ test("Pages publishing is isolated to a least-privilege results job", () => {
     "id-token": "write",
   });
   assert.equal((publish.environment as { name: string }).name, "github-pages");
-  assert.ok(
-    publish.steps.some((step) => step.run?.includes("scripts/site.ts")),
-  );
+  assert.ok(publish.steps.some((step) => step.run?.includes("pnpm site")));
   assert.ok(
     publish.steps.some((step) =>
       step.uses?.startsWith("actions/deploy-pages@"),

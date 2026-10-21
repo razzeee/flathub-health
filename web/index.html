@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <script>
+      try {
+        const theme = localStorage.getItem("health-theme");
+        if (theme === "light" || theme === "dark")
+          document.documentElement.dataset.theme = theme;
+      } catch {}
+    </script>
+    <meta
+      name="description"
+      content="Startup checks, recipe outcomes and captured evidence for selected released Flathub apps."
+    />
+    <title>Flathub health · Release checks</title>
+    <script type="module" src="/src/main.tsx"></script>
+  </head>
+  <body>
+    <div id="root"><!--app--></div>
+    <script id="page-data" type="application/json">
+      {
+        "rows": [],
+        "images": {},
+        "runUrl": "https://github.com/razzeee/flathub-health/actions"
+      }
+    </script>
+  </body>
+</html>

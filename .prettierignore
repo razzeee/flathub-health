@@ -3,3 +3,4 @@ artifacts/
 .runner/
 .health-work/
 pnpm-lock.yaml
+site/

@@ -203,10 +203,10 @@ jobs:
           pattern: health-*
           path: downloads
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-      - run: pnpm install --prod --frozen-lockfile
+      - run: pnpm install --frozen-lockfile
       - name: Build read-only results page
-        # Runtime schema validation uses the same dependency as the reporter.
-        run: node scripts/site.ts --report downloads/report/report.json --artifacts downloads --output site
+        # Validate report records, build the client, and prerender static HTML.
+        run: pnpm site --report downloads/report/report.json --artifacts downloads --output site
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d
       - uses: actions/upload-pages-artifact@5f327015a708106f6f1b7c9a633901af30fe80cb
         with:
