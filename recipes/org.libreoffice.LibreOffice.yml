@@ -1,5 +1,6 @@
 version: 1
 window:
+  title: sample.odt - LibreOffice Writer
   width: 900
   height: 650
 setup:

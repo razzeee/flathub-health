@@ -107,6 +107,7 @@ test("LibreOffice recipe seeds and opens the licensed sample document", () => {
   assert.deepEqual(parsed.errors, []);
   const recipe = z
     .object({
+      window: z.object({ title: z.string() }),
       setup: z.object({
         files: z.array(
           z.object({ source: z.string(), destination: z.string() }),
@@ -130,6 +131,7 @@ test("LibreOffice recipe seeds and opens the licensed sample document", () => {
       destination: "data/documents/sample.odt",
     },
   ]);
+  assert.equal(recipe.window.title, "sample.odt - LibreOffice Writer");
   assert.deepEqual(recipe.launch.args, [
     "--writer",
     "${APP_DATA}/documents/sample.odt",
