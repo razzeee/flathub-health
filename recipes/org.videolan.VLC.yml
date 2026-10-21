@@ -6,7 +6,6 @@ setup:
 launch:
   args:
     - --no-one-instance
-    - --play-and-exit
     - "${APP_DATA}/VLC-smoke-test.mp4"
 window:
   title: VLC media player
