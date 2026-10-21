@@ -1,5 +1,7 @@
 name: Flathub health
 on:
+  schedule:
+    - cron: "17 5 * * *"
   workflow_dispatch:
 
 permissions:

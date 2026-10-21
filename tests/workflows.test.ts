@@ -16,6 +16,7 @@ interface Step {
 interface Workflow {
   on: Record<string, unknown>;
   permissions: Record<string, string>;
+  concurrency?: Record<string, unknown>;
   jobs: Record<
     string,
     {
@@ -90,10 +91,17 @@ test("PR and push checks only install dependencies and run safe checks", () => {
   assert.equal(pkg.packageManager, "pnpm@12.6.0");
 });
 
-test("app jobs remain manual and depend on successful catalog validation", () => {
+test("app jobs run daily or manually and depend on successful catalog validation", () => {
   const apps = workflow("check-apps.yml");
-  assert.deepEqual(apps.on, { workflow_dispatch: null });
+  assert.deepEqual(apps.on, {
+    schedule: [{ cron: "17 5 * * *" }],
+    workflow_dispatch: null,
+  });
   assert.deepEqual(apps.permissions, { actions: "read", contents: "read" });
+  assert.deepEqual(apps.concurrency, {
+    group: "flathub-health",
+    "cancel-in-progress": false,
+  });
   assert.equal(apps.jobs.check!.needs, "catalog");
   assert.equal(apps.jobs.check!.if, undefined);
   assert.equal(apps.jobs.catalog!.if, undefined);

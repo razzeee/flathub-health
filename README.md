@@ -20,9 +20,10 @@ is historical evidence for flatpak-smoke `v0.2.0`: the three recipes passed
 startup and capture, and VLC and LibreOffice passed startup checks. See
 [docs/validation.md](docs/validation.md) for the run history and remaining check.
 
-The workflow is manual-only. No daily schedule is active. A startup pass does
-not prove that all app functions work. Failure isolation still needs hosted
-validation before scheduling is considered.
+The workflow runs daily at 05:17 UTC and can also be started manually. A startup
+pass does not prove that all app functions work. Hosted scheduled runs must
+produce complete reports repeatedly before the daily workflow is considered
+validated.
 
 ## Setup
 
@@ -100,22 +101,22 @@ they are not substituted for commits reported by the test containers.
 ## GitHub Actions
 
 Open [Actions](https://github.com/razzeee/flathub-health/actions), select
-"Flathub health", and choose "Run workflow". The configured v0.4.0 images have
-public manifests. Hosted app validation is pending.
+"Flathub health", and choose "Run workflow" to start a manual run. The workflow
+also runs daily at 05:17 UTC; GitHub can delay scheduled jobs. The configured
+v0.4.0 images have public manifests. Hosted app validation is pending.
 For future upgrades, update the source revision and both image
 tags together in `runner.json` to a verified release with available images.
 
-Keep the workflow manual-only until a hosted end-to-end run succeeds. Also test
-a failing recipe and confirm that the other apps still upload their artifacts.
-After those checks, add a daily schedule if wanted. `17 5 * * *` requests a run
-at 05:17 UTC. GitHub can delay scheduled jobs.
+To pause daily runs, disable "Flathub health" from its Actions page (this also
+disables manual runs). To keep manual runs available but stop the schedule,
+remove the `schedule` trigger from `.github/workflows/check-apps.yml` and merge
+that change. Re-enable the workflow or restore the trigger to resume daily runs.
 
 For an explicitly labeled, isolated hosted workflow-fixture run, select
 "Hosted failure-isolation test (opt-in)" and type `RUN HOSTED FAILURE TEST`.
 It is workflow-dispatch-only, uses no app-catalog entries or privileged
 containers, and writes fixture artifacts under separate names; one matrix case
-intentionally omits its artifact. The normal health workflow has no schedule or
-input that can enable one. The test suite separately exercises install failure,
+intentionally omits its artifact. The test suite separately exercises install failure,
 missing/incomplete report evidence, distinct app/recipe/infrastructure
 classifications, and TERM cancellation/process-group cleanup. A GitHub-hosted
 fixture run validates matrix continuation and artifact handling, not real
