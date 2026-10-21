@@ -12,14 +12,25 @@ Linux amd64 immutable image digests are recorded in the release notes:
 Hosted app validation of v0.4.1 is pending. The upstream release notes report
 that VLC actual-media screenshot completion remains unverified because of
 window-selection/focus failures; this pin does not alter downstream recipes.
-The workflow remains manual-only pending failure-isolation validation.
+The workflow now runs daily at 05:17 UTC, as enabled on main, and can also be
+started manually. The rebase preserves this schedule and the v0.4.1 pin.
+
+The v0.4.0 [main run 39583067820](https://github.com/razzeee/flathub-health/actions/runs/39583067820)
+passed startup for all five original apps and recipes for four. VLC's screenshot
+desktop exited with status 133 (`infrastructure_failed`); all artifacts and the
+complete report uploaded. The opt-in [failure-isolation fixture run 39579256859](https://github.com/razzeee/flathub-health/actions/runs/39579256859)
+passed, but is not real privileged-container cleanup validation. The workflow
+now includes main's daily schedule; these additions do not change its timing.
 
 On 2026-10-21, Firefox and GIMP were added directly at the user's request as
 startup-only catalog entries, bringing the matrix to seven apps. Neither has a
-screenshot recipe or a hosted startup result from this change. Runtime,
-download, and artifact costs remain unmeasured; issue #7's budget decision is
-still pending. This addition does not establish completion of issue #12's
-hosted-validation and measured-budget gates.
+screenshot recipe. [Hosted run 39585913867](https://github.com/razzeee/flathub-health/actions/runs/39585913867)
+passed preparation and startup for both and recorded resource measurements.
+Firefox's capture shows a first-run welcome dialog; GIMP's shows a splash screen,
+not editor readiness. The aggregate report preserves all seven app results and
+returns nonzero for VLC's existing screenshot infrastructure failure. The user
+clarified that issue #7 and budget measurement are not gates for issue #12.
+See [catalog-selection.md](catalog-selection.md) for measured costs and limits.
 
 The previous pin, v0.2.0 at `65fc5d65e02bbf18812d3b9e56ddaa172242e415`, had a
 successful hosted run on all five apps:
@@ -28,7 +39,8 @@ successful hosted run on all five apps:
 Last checked on 2026-10-21. The release tag, source revision, and published
 image manifests were verified; local image configuration-label inspection was
 unavailable because Docker socket access was denied. Hosted app validation has
-not yet run.
+not yet run for v0.4.1. The v0.4.0 hosted results above are historical evidence,
+not validation of the newer pin or a claim of repeated stability.
 
 ## Passing checks
 
@@ -42,7 +54,7 @@ pnpm test
 node scripts/catalog.ts
 ```
 
-All 38 tests pass locally. They cover catalog validation, failure classification,
+All 42 tests pass locally. They cover catalog validation, failure classification,
 timeouts, process-group cleanup, cancellation, logs, path containment, and
 reporting with failed or missing artifacts. They also verify that a missing
 screenshot image preserves startup results and that apps without recipes skip
@@ -65,8 +77,8 @@ cache behavior is preserved.
 
 The workflow requests only `contents: read` and does not retain checkout
 credentials. It references no secrets and runs no Docker, Flatpak, app jobs,
-privileged containers, or publishing steps. The app workflow remains manual-only
-with its existing catalog prerequisite. No schedule is enabled.
+privileged containers, or publishing steps. The app workflow runs daily or
+manually with its existing catalog prerequisite; the schedule was enabled on main.
 
 Workflow regression tests parse both YAML files to check triggers, permissions,
 the safe command allowlist, setup and caching, action pins, and the manual app
@@ -204,11 +216,14 @@ recipe still needs repeated hosted runs before that stability claim is made.
 
 The first hosted attempt for PR #24 ([run 39445551464](https://github.com/razzeee/flathub-health/actions/runs/39445551464)) passed VLC startup but failed screenshot setup before opening the fixture: flatpak-smoke rejects setup source paths containing `..`. The startup screenshot was only the VLC player shell, not a media capture. The follow-up moves the fixture beneath the recipe directory and adds a regression test requiring a contained, existing source path. Repeated hosted media captures remain required before issue #10 is complete.
 
-## Before enabling daily runs
+## Remaining hosted validation
 
-1. Break one recipe and confirm that other jobs still upload their artifacts
-   and the report identifies the failure.
+1. Resolve the observed VLC screenshot infrastructure failure and establish
+   repeated complete hosted runs, including the new startup-only entries.
+2. See [catalog-selection.md](catalog-selection.md) for the dated five-app
+   baseline, measurement scope, and hosted candidate results. Cost data is
+   informational and not a gate for these additions, per the user's clarification.
 
-Keep the workflow manual-only until failure isolation passes. Unit tests do not
+This change preserves main's daily schedule. Unit tests do not
 prove that a failed app job leaves other hosted jobs and artifact aggregation
 unaffected.

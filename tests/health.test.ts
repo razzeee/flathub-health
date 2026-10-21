@@ -82,15 +82,18 @@ test("seven-app catalog and job matrix", () => {
   });
 });
 
-test("Firefox and GIMP remain startup-only with pending hosted validation", () => {
+test("Firefox and GIMP remain startup-only with explicit capture limitations", () => {
   for (const id of ["org.mozilla.firefox", "org.gimp.GIMP"]) {
     const entry = load().find(({ app_id }) => app_id === id);
     assert.ok(entry);
     assert.equal(entry.recipe, undefined);
     assert.match(entry.limitations, /Startup-only/);
+    assert.match(entry.limitations, /No screenshot recipe/);
     assert.match(
       entry.limitations,
-      /hosted validation and cost measurement are pending/,
+      id === "org.mozilla.firefox"
+        ? /first-run welcome dialog/
+        : /splash screen, not editor readiness/,
     );
   }
 });

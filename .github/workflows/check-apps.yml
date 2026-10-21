@@ -67,6 +67,7 @@ jobs:
       - run: pnpm install --prod --frozen-lockfile
       - name: Begin app-check resource measurement
         id: measurement
+        continue-on-error: true # Missing metrics must not suppress app validation.
         env:
           APP_ID: ${{ matrix.app_id }}
         run: node scripts/measure.ts start "$APP_ID"
@@ -76,6 +77,7 @@ jobs:
         run: node scripts/run.ts --app "$APP_ID"
       - name: Record app-check resource measurement
         if: always() && steps.measurement.outcome == 'success'
+        continue-on-error: true
         env:
           APP_ID: ${{ matrix.app_id }}
         run: node scripts/measure.ts finish "$APP_ID"
