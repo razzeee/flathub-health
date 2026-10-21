@@ -43,7 +43,9 @@ jobs:
     strategy:
       fail-fast: false
       max-parallel: 2
-      matrix: ${{ fromJSON(needs.catalog.outputs.matrix) }}
+      matrix:
+        include:
+          - app_id: org.libreoffice.LibreOffice
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -62,6 +64,8 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --prod --frozen-lockfile
+      - name: Install temporary focus diagnostics (branch-only)
+        run: python3 scripts/diagnostics/install-focus-probe.py
       - name: Check released app and capture recipe
         env:
           APP_ID: ${{ matrix.app_id }}

@@ -1,0 +1,33 @@
+#!/usr/bin/python3
+"""TEMPORARY focus probe; keep the pinned helper's decisions unchanged."""
+import os
+from pathlib import Path
+import sys
+
+extension = Path(os.environ['XDG_DATA_HOME']) / 'gnome-shell/extensions/capture@flatpak-smoke/extension.js'
+source = extension.read_text()
+needle = '        window.activate(global.get_current_time());\n        await delay(100);'
+probe = '''        const focusProbe = phase => {
+            try {
+                const describe = target => target ? {
+                    id: target.get_stable_sequence(), title: target.get_title(),
+                    type: target.get_window_type(), app_id: target.get_sandboxed_app_id(),
+                    minimized: target.minimized, frame: target.get_frame_rect(),
+                    showing: target.showing_on_its_workspace(),
+                    mapped: target.get_compositor_private()?.mapped,
+                } : null;
+                console.log('[DEBUG-lo-focus] ' + JSON.stringify({
+                    phase, action: request.action, time: GLib.get_monotonic_time(),
+                    selected: describe(window), focused: describe(global.display.focus_window),
+                    modalCount: Main.modalCount, windows: this._windows().map(describe),
+                }));
+            } catch (error) { console.log('[DEBUG-lo-focus] probe error: ' + error.message); }
+        };
+        focusProbe('before-activate');
+        window.activate(global.get_current_time());
+        await delay(100);
+        focusProbe('after-100ms');'''
+if source.count(needle) != 1:
+    raise RuntimeError('Pinned helper did not match diagnostic probe boundary')
+extension.write_text(source.replace(needle, probe))
+os.execv('/usr/bin/gnome-shell', ['/usr/bin/gnome-shell', *sys.argv[1:]])
