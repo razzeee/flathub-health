@@ -4,6 +4,9 @@ import os
 from pathlib import Path
 import sys
 
+if '--version' in sys.argv[1:]:
+    os.execv('/usr/bin/gnome-shell', ['/usr/bin/gnome-shell', *sys.argv[1:]])
+
 extension = Path(os.environ['XDG_DATA_HOME']) / 'gnome-shell/extensions/capture@flatpak-smoke/extension.js'
 source = extension.read_text()
 needle = '        window.activate(global.get_current_time());\n        await delay(100);'
