@@ -34,6 +34,16 @@ pass does not prove that all app functions work. Hosted scheduled runs must
 produce complete reports repeatedly before the daily workflow is considered
 validated.
 
+The `publish-results` job deploys the read-only results page to GitHub Pages
+after each workflow run. Configure the repository's Pages source to **GitHub
+Actions** before the first deployment. The page marks results stale after 36
+hours, updating at expiry and when a browser tab resumes. Without JavaScript,
+freshness is explicitly unverified. Only runs on the default branch publish.
+It shows at most three smoke-test captures per app (2 MiB per
+image, 30 MiB total) from the latest run; the deployment replaces the prior
+published set. Diagnostic artifacts remain in Actions for 14 days. Missing or
+invalid reports are shown as unavailable/incomplete, never as passing.
+
 ## Setup
 
 Use Linux x86_64 with these tools:
@@ -161,10 +171,12 @@ The process adapter writes logs as commands run. On timeout or cancellation, it
 sends TERM to the child process group, then KILL if needed. The TERM handler in
 the upstream wrapper gets time to remove its Docker container.
 
-Workflow permissions are read-only, and checkout does not retain credentials.
-The workflow has no secrets or PR triggers. Run privileged containers only on
-disposable VMs with reviewed code. Do not use shared machines that hold secrets.
-The separate report job reads downloaded JSON without executing artifact files.
+Test and report workflow permissions are read-only, and checkout does not retain
+credentials. The separate Pages publishing job alone gets `pages: write` and
+`id-token: write` (plus read access to Actions artifacts); it downloads data and
+publishes static files without executing artifact files. The workflow has no
+secrets or PR triggers. Run privileged containers only on disposable VMs with
+reviewed code. Do not use shared machines that hold secrets.
 
 Reports distinguish startup failures, `recipe_failed`, `infrastructure_failed`,
 and `incomplete`. Preparation and download errors count as infrastructure

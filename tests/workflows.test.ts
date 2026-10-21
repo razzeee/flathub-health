@@ -172,6 +172,32 @@ test("resource measurements cannot suppress app checks or diagnostic upload", ()
   assert.equal(steps[upload]!.if, "always()");
 });
 
+test("Pages publishing is isolated to a least-privilege results job", () => {
+  const apps = workflow("check-apps.yml");
+  const publish = apps.jobs["publish-results"]!;
+  assert.equal(
+    publish.if,
+    "always() && needs.catalog.result == 'success' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)",
+  );
+  assert.deepEqual(publish.needs, ["catalog", "check", "report"]);
+  assert.deepEqual(publish.permissions, {
+    actions: "read",
+    contents: "read",
+    pages: "write",
+    "id-token": "write",
+  });
+  assert.equal((publish.environment as { name: string }).name, "github-pages");
+  assert.ok(
+    publish.steps.some((step) => step.run?.includes("scripts/site.ts")),
+  );
+  assert.ok(
+    publish.steps.some((step) =>
+      step.uses?.startsWith("actions/deploy-pages@"),
+    ),
+  );
+  assert.equal(apps.jobs.check!.permissions, undefined);
+});
+
 test("hosted failure fixtures require explicit confirmation and stay outside the app catalog", () => {
   const fixture = workflow("test-failure-isolation.yml");
   assert.deepEqual(Object.keys(fixture.on), ["workflow_dispatch"]);
@@ -253,6 +279,9 @@ function assertActionPins(workflows: Workflow[]): void {
     "actions/setup-node",
     "actions/upload-artifact",
     "actions/download-artifact",
+    "actions/configure-pages",
+    "actions/upload-pages-artifact",
+    "actions/deploy-pages",
   ]);
   // Review release commits in the dependency PR. A second SHA list here would
   // reject every Dependabot update instead of checking the pinning policy.

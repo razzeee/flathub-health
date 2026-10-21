@@ -13,7 +13,8 @@
     "test": "node --test tests/*.test.ts",
     "catalog": "node scripts/catalog.ts",
     "run-app": "node scripts/run.ts",
-    "report": "node scripts/report.ts"
+    "report": "node scripts/report.ts",
+    "site": "node scripts/site.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
