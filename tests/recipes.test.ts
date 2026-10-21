@@ -80,7 +80,6 @@ test("VLC recipe seeds and opens its redistributable media fixture", () => {
   ]);
   assert.deepEqual(value.launch.args, [
     "--no-one-instance",
-    "--play-and-exit",
     "${APP_DATA}/VLC-smoke-test.mp4",
   ]);
   assert.ok(
