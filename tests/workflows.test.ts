@@ -11,6 +11,8 @@ interface Step {
   uses?: string;
   run?: string;
   with?: Record<string, unknown>;
+  if?: string;
+  "continue-on-error"?: boolean;
 }
 
 interface Workflow {
@@ -144,6 +146,29 @@ test("app jobs run daily or manually and depend on successful catalog validation
   assert.equal(reportUploads.length, 2);
   assert.equal(reportUploads[1]!.with?.["retention-days"], 14);
   assert.match(String(reportUploads[1]!.with?.name), /history-/);
+});
+
+test("resource measurements cannot suppress app checks or diagnostic upload", () => {
+  const steps = workflow("check-apps.yml").jobs.check!.steps;
+  const start = steps.findIndex(({ id }) => id === "measurement");
+  const run = steps.findIndex(
+    ({ run }) => run === 'node scripts/run.ts --app "$APP_ID"',
+  );
+  const finish = steps.findIndex(
+    ({ run }) => run === 'node scripts/measure.ts finish "$APP_ID"',
+  );
+  const upload = steps.findIndex(
+    ({ name }) => name === "Upload logs and images",
+  );
+  assert.ok(start >= 0 && run > start && finish > run && upload > finish);
+  assert.equal(steps[start]!["continue-on-error"], true);
+  assert.equal(steps[run]!["continue-on-error"], undefined);
+  assert.equal(steps[finish]!["continue-on-error"], true);
+  assert.equal(
+    steps[finish]!.if,
+    "always() && steps.measurement.outcome == 'success'",
+  );
+  assert.equal(steps[upload]!.if, "always()");
 });
 
 test("hosted failure fixtures require explicit confirmation and stay outside the app catalog", () => {

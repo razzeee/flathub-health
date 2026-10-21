@@ -8,17 +8,26 @@ the results. It does not rebuild app manifests.
 
 ## Status
 
-The catalog has five apps. Calculator, KCalc, and VSCodium cover GTK, Qt, and
+The catalog has seven apps. Calculator, KCalc, and VSCodium cover GTK, Qt, and
 Electron. Their recipes come from flatpak-smoke's `tests/compatibility/` at the
 revision in `runner.json`. VLC opens a short, silent CC0 test video and
-LibreOffice opens a bundled CC0 Writer document from a clean profile. See
+LibreOffice opens a bundled CC0 Writer document from a clean profile. Firefox
+and GIMP are startup-only additions with no screenshot recipes; both passed
+hosted startup checks. Captures show Firefox's welcome dialog and GIMP's splash
+screen, not web compatibility or editor readiness. Their inclusion was requested
+directly; budget is not a gate for these additions. See
 [the selection notes](docs/catalog-selection.md) for sources and test limits.
 
-The latest successful hosted run
+The historical successful hosted run
 ([39441598891](https://github.com/razzeee/flathub-health/actions/runs/39441598891))
 is historical evidence for flatpak-smoke `v0.2.0`: the three recipes passed
 startup and capture, and VLC and LibreOffice passed startup checks. See
 [docs/validation.md](docs/validation.md) for the run history and remaining check.
+
+The newer v0.4.0 main run passed startup for the original five apps, but VLC's
+screenshot phase failed in the desktop infrastructure. See the dated
+[cost baseline](docs/catalog-selection.md#measured-five-app-baseline) for
+observed job times and compressed artifact sizes; these are not an agreed budget.
 
 The workflow runs daily at 05:17 UTC and can also be started manually. A startup
 pass does not prove that all app functions work. Hosted scheduled runs must
@@ -54,6 +63,8 @@ node scripts/run.ts --app org.kde.kcalc
 node scripts/run.ts --app com.vscodium.codium
 node scripts/run.ts --app org.videolan.VLC
 node scripts/run.ts --app org.libreoffice.LibreOffice
+node scripts/run.ts --app org.mozilla.firefox
+node scripts/run.ts --app org.gimp.GIMP
 node scripts/report.ts
 ```
 
@@ -103,7 +114,9 @@ they are not substituted for commits reported by the test containers.
 Open [Actions](https://github.com/razzeee/flathub-health/actions), select
 "Flathub health", and choose "Run workflow" to start a manual run. The workflow
 also runs daily at 05:17 UTC; GitHub can delay scheduled jobs. The configured
-v0.4.0 images have public manifests. Hosted app validation is pending.
+v0.4.1 images have public manifests. Firefox and GIMP passed hosted startup
+checks with v0.4.0; validation with the newer pin remains pending. Limitations
+and measured run costs are documented in the selection notes.
 For future upgrades, update the source revision and both image
 tags together in `runner.json` to a verified release with available images.
 
@@ -132,9 +145,10 @@ Docker-container cleanup; that remains covered by the safe process tests.
   a 5-minute timeout. Other preparation commands have their own timeouts.
 - Each runner phase has a 5-minute internal timeout and a 7-minute outer timeout,
   followed by a cleanup period. Each app job has a 45-minute limit.
-- Five app jobs can use at most 225 VM-minutes per run, plus the catalog and
-  report jobs. A daily run would use at most about 6,750 app VM-minutes in a
-  30-day month. Downloads and screenshot storage add to that cost.
+- Seven app jobs can use at most 315 VM-minutes per run, plus the catalog and
+  report jobs. A daily run would use at most about 9,450 app VM-minutes in a
+  30-day month. These are timeout ceilings, not measured costs or an agreed
+  budget. Downloads and screenshot storage add to that cost.
 - GitHub keeps result artifacts and the combined report for 14 days.
 
 ### Failures and permissions

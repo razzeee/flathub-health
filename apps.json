@@ -40,6 +40,20 @@
       "arch": "x86_64",
       "recipe": "recipes/org.libreoffice.LibreOffice.yml",
       "limitations": "Opens a bundled CC0 sample document in Writer and captures it. Does not test editing, saving, exporting, or compatibility with other file formats."
+    },
+    {
+      "app_id": "org.mozilla.firefox",
+      "name": "Firefox",
+      "branch": "stable",
+      "arch": "x86_64",
+      "limitations": "Startup-only check in a clean profile. The hosted capture shows Firefox's first-run welcome dialog, not a loaded web page. No screenshot recipe. Does not test page rendering, network access, accounts, extensions, media playback, or general web compatibility."
+    },
+    {
+      "app_id": "org.gimp.GIMP",
+      "name": "GIMP",
+      "branch": "stable",
+      "arch": "x86_64",
+      "limitations": "Startup-only check in a clean profile. The hosted capture shows GIMP's splash screen, not editor readiness. No screenshot recipe or image fixture. Does not test image loading, editing, saving, exporting, plug-ins, color management, or format compatibility."
     }
   ]
 }
