@@ -168,3 +168,48 @@ jobs:
           path: artifacts/report/history.json
           if-no-files-found: error
           retention-days: 14
+
+  publish-results:
+    if: always() && needs.catalog.result == 'success' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    needs: [catalog, check, report]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        continue-on-error: true
+        with:
+          name: health-report
+          path: downloads/report
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        continue-on-error: true
+        with:
+          pattern: health-*
+          path: downloads
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - run: pnpm install --prod --frozen-lockfile
+      - name: Build read-only results page
+        # Runtime schema validation uses the same dependency as the reporter.
+        run: node scripts/site.ts --report downloads/report/report.json --artifacts downloads --output site
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d
+      - uses: actions/upload-pages-artifact@5f327015a708106f6f1b7c9a633901af30fe80cb
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346
