@@ -19,7 +19,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        case: [recipe-failure, unaffected-matrix, missing-artifact]
+        case:
+          [
+            recipe-failure,
+            unaffected-matrix,
+            missing-artifact,
+            installation-failure,
+            cancellation-cleanup,
+          ]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -32,8 +39,14 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Run isolated failure behavior tests
         run: pnpm test
+      - name: Exercise installation failure and cancellation fixtures
+        if: matrix.case == 'installation-failure' || matrix.case == 'cancellation-cleanup'
+        env:
+          CASE: ${{ matrix.case }}
+          FIXTURE_EVIDENCE: hosted-fixtures
+        run: node scripts/hosted-fixture.ts
       - name: Create fixture evidence (never an app-catalog artifact)
-        if: always() && matrix.case != 'missing-artifact'
+        if: always() && matrix.case != 'missing-artifact' && matrix.case != 'installation-failure' && matrix.case != 'cancellation-cleanup'
         env:
           CASE: ${{ matrix.case }}
         run: |
@@ -64,4 +77,6 @@ jobs:
           test -f fixture-downloads/hosted-fixture-unaffected-matrix/unaffected-matrix.txt
           test ! -e fixture-downloads/hosted-fixture-missing-artifact
           test -f fixture-downloads/hosted-fixture-recipe-failure/recipe-failure.txt
+          test -f fixture-downloads/hosted-fixture-installation-failure/installation-failure.txt
+          test -f fixture-downloads/hosted-fixture-cancellation-cleanup/cancellation-cleanup.txt
           echo 'Hosted fixture evidence is isolated from artifacts/ and the app catalog. The missing-artifact matrix case intentionally uploaded nothing.' >> "$GITHUB_STEP_SUMMARY"
