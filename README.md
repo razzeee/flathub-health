@@ -80,13 +80,12 @@ profiles. Each container downloads its runtime.
 pulls each image once per job, records its immutable digest, and runs that digest.
 The workflow reads its upstream checkout revision from the same validated config.
 Each digest is saved before invoking the upstream action.
-Reports include the app version, ref, OSTree commit, runtime ref and commit,
-runner revision and image digests, runner environment, and UTC test time.
-Unresolved versions appear as unavailable or unknown.
-
-The recorded runtime commit comes from the preparation installation. Runtime
-downloads can change between phases, so it does not prove that both containers
-used that commit.
+Reports include app and runtime refs and commits reported by each test phase,
+the runner image version, reference and immutable digest used by that phase,
+the recipe content hash, runner environment, and UTC test time. Missing phase
+metadata is represented as unavailable rather than inferred from preparation.
+The preparation installation's commits remain in `resolved` for comparison;
+they are not substituted for commits reported by the test containers.
 
 ## GitHub Actions
 

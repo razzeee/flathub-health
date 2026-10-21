@@ -69,6 +69,8 @@ interface Invocation {
   app: App;
   mode: Mode;
   image: string;
+  runnerVersion?: string;
+  runnerImageName?: string;
   bundle: string;
   output: string;
   runner: string;
@@ -82,6 +84,8 @@ export const invoke: Invoker = async ({
   app,
   mode,
   image,
+  runnerVersion,
+  runnerImageName,
   bundle,
   output,
   runner,
@@ -131,6 +135,17 @@ export const invoke: Invoker = async ({
     raw = null;
   }
   const parsed = upstreamResultSchema.safeParse(raw);
+  const phaseMetadata = parsed.success ? parsed.data.phase_metadata : undefined;
+  const metadata = {
+    app: phaseMetadata?.app ?? null,
+    runtimes: phaseMetadata?.runtimes ?? null,
+    recipe: phaseMetadata?.recipe ?? null,
+    runner_image: {
+      version: runnerVersion ?? loadRunner(ROOT).version,
+      image: runnerImageName ?? image.split("@")[0]!,
+      digest: image.split("@")[1] ?? null,
+    },
+  };
   if (parsed.success && parsed.data.status === "passed") {
     const ref = `app/${app.app_id}/${app.arch}/${app.branch}`;
     const captures = parsed.data.screenshots;
@@ -153,10 +168,11 @@ export const invoke: Invoker = async ({
         status: "infrastructure_failed",
         exit_code: result.code,
         message: "runner passed without expected app ref or screenshot files",
+        metadata,
       };
     }
   }
-  return classify(result.code, raw, mode);
+  return { ...classify(result.code, raw, mode), metadata };
 };
 
 interface RunOptions {
@@ -322,6 +338,8 @@ export async function runApp(
           app,
           mode,
           image,
+          runnerVersion: config.version,
+          runnerImageName: config[`${mode}_image`],
           bundle,
           output,
           runner,

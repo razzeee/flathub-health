@@ -40,6 +40,23 @@ export const outcomeSchema = z.strictObject({
   message: z.string().optional(),
   exit_code: z.number().int().nullable().optional(),
   reason: z.string().optional(),
+  metadata: z
+    .strictObject({
+      app: z.strictObject({ ref: line, commit: line.nullable() }).nullable(),
+      runtimes: z
+        .array(z.strictObject({ ref: line, commit: line.nullable() }))
+        .nullable(),
+      recipe: z.strictObject({ content_hash: line }).nullable(),
+      runner_image: z.strictObject({
+        version: line,
+        image: line,
+        digest: z
+          .string()
+          .regex(/^sha256:[a-f0-9]{64}$/)
+          .nullable(),
+      }),
+    })
+    .optional(),
 });
 export type Outcome = z.infer<typeof outcomeSchema>;
 
@@ -124,6 +141,19 @@ const upstreamFields = {
   schema_version: z.literal(1),
   app_ref: z.string().nullable().optional(),
   screenshots: z.array(z.string()).optional(),
+  phase_metadata: z
+    .object({
+      app: z
+        .object({ ref: line, commit: line.nullable() })
+        .nullable()
+        .optional(),
+      runtimes: z
+        .array(z.object({ ref: line, commit: line.nullable() }))
+        .nullable()
+        .optional(),
+      recipe: z.object({ content_hash: line }).nullable().optional(),
+    })
+    .optional(),
 };
 export const upstreamResultSchema = z.discriminatedUnion("status", [
   z.object({

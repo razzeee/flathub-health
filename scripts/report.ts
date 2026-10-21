@@ -65,6 +65,29 @@ export function render(rows: ReportRow[]): string {
       `Runner: ${cell(JSON.stringify("runner" in row ? row.runner : {}))}`,
     );
     for (const phase of phases) {
+      const metadata = row.phases[phase].metadata;
+      const runner = "runner" in row ? row.runner : undefined;
+      const configuredImage =
+        phase === "verify"
+          ? runner?.verify_image
+          : phase === "screenshots"
+            ? runner?.screenshots_image
+            : undefined;
+      const image = metadata?.runner_image.image ?? configuredImage;
+      const imageVersion = metadata?.runner_image.version ?? runner?.version;
+      const imageDigest =
+        metadata?.runner_image.digest ??
+        (phase === "verify"
+          ? runner?.verify_digest?.split("@")[1]
+          : phase === "screenshots"
+            ? runner?.screenshots_digest?.split("@")[1]
+            : undefined);
+      lines.push(
+        `- ${phase} app: ${cell(metadata?.app ? `${metadata.app.ref} (commit ${metadata.app.commit ?? "unavailable"})` : "unavailable")}`,
+        `- ${phase} runtimes: ${cell(metadata?.runtimes?.length ? metadata.runtimes.map((runtime) => `${runtime.ref} (commit ${runtime.commit ?? "unavailable"})`).join(", ") : "unavailable")}`,
+        `- ${phase} runner image: ${cell(imageVersion ?? "unavailable")} (${cell(image ?? "unavailable")}; digest ${cell(imageDigest ?? "unavailable")})`,
+        `- ${phase} recipe content hash: ${cell(metadata?.recipe?.content_hash ?? "unavailable")}`,
+      );
       if (row.phases[phase].message)
         lines.push(`- ${phase}: ${cell(row.phases[phase].message)}`);
     }

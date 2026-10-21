@@ -637,6 +637,19 @@ test("upstream action invocation validates ref and real screenshot files", async
     status: "passed",
     app_ref: `app/${app().app_id}/x86_64/stable`,
     screenshots: ["capture.png"],
+    phase_metadata: {
+      app: {
+        ref: `app/${app().app_id}/x86_64/stable`,
+        commit: "app-phase-commit",
+      },
+      runtimes: [
+        {
+          ref: "runtime/org.freedesktop.Platform/x86_64/24.08",
+          commit: "runtime-phase-commit",
+        },
+      ],
+      recipe: { content_hash: "md5:0123456789abcdef0123456789abcdef" },
+    },
   };
   writeJson(result, raw);
   const options = {
@@ -662,6 +675,14 @@ test("upstream action invocation validates ref and real screenshot files", async
   assert.equal((await invoke(options)).status, "infrastructure_failed");
   writeFileSync(join(destination, "capture.png"), "screenshot");
   assert.equal((await invoke(options)).status, "passed");
+  const passed = await invoke(options);
+  assert.equal(passed.metadata?.app?.commit, "app-phase-commit");
+  assert.equal(passed.metadata?.runtimes?.[0]?.commit, "runtime-phase-commit");
+  assert.equal(
+    passed.metadata?.recipe?.content_hash,
+    raw.phase_metadata.recipe.content_hash,
+  );
+  assert.match(passed.metadata!.runner_image.digest!, /^sha256:/);
   writeJson(result, { ...raw, app_ref: "wrong" });
   assert.equal((await invoke(options)).status, "infrastructure_failed");
   writeJson(result, { ...raw, screenshots: ["../../outside.png"] });
@@ -683,6 +704,24 @@ test("report keeps failed jobs, identifies missing or corrupt jobs, and includes
   assert.equal(rows[1]!.phases.verify.status, "incomplete");
   assert.match(render(rows), /&lt;error&gt;&#124;message/);
   assert.ok(render(rows).includes(loadRunner(ROOT).revision));
+  assert.match(render(rows), /verify app: unavailable/);
+  assert.match(render(rows), /verify recipe content hash: unavailable/);
+  const populated = record();
+  populated.phases.verify.metadata = {
+    app: { ref: "app/example", commit: "phase-app-commit" },
+    runtimes: [{ ref: "runtime/example", commit: "phase-runtime-commit" }],
+    recipe: { content_hash: "md5:0123456789abcdef0123456789abcdef" },
+    runner_image: {
+      version: "v0.4.0",
+      image: "ghcr.io/example/verify",
+      digest: `sha256:${"a".repeat(64)}`,
+    },
+  };
+  const detailed = render([populated]);
+  assert.match(detailed, /phase-app-commit/);
+  assert.match(detailed, /phase-runtime-commit/);
+  assert.match(detailed, /md5:0123456789abcdef0123456789abcdef/);
+  assert.match(detailed, /v0\.4\.0/);
   writeFileSync(join(path, "health.json"), "not JSON");
   assert.ok("error" in aggregate(apps, root)[0]!);
   writeJson(join(path, "health.json"), null);
@@ -718,6 +757,21 @@ test("artifact schemas reject malformed metadata, phase outcomes, and version de
     { ...valid, resolved: { ...valid.resolved, version: 42 } },
     { ...valid, runner: { ...valid.runner, revision: "main" } },
     { ...valid, runner: { ...valid.runner, verify_digest: "not-a-digest" } },
+    {
+      ...valid,
+      phases: {
+        ...valid.phases,
+        verify: {
+          ...valid.phases.verify,
+          metadata: {
+            app: { ref: "app/example", commit: 42 },
+            runtimes: null,
+            recipe: null,
+            runner_image: { version: "v0.4.0", image: "image", digest: null },
+          },
+        },
+      },
+    },
     { ...valid, runner: { ...valid.runner, screenshots_digest: undefined } },
     {
       ...valid,
