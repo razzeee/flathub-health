@@ -2,13 +2,16 @@
   "compilerOptions": {
     "target": "ES2024",
     "module": "NodeNext",
+    "jsx": "react-jsx",
+    "paths": { "@/*": ["./web/src/*"] },
     "types": ["node"],
     "strict": true,
+    "skipLibCheck": true,
     "noUncheckedIndexedAccess": true,
     "erasableSyntaxOnly": true,
     "verbatimModuleSyntax": true,
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "include": ["scripts/**/*.ts", "tests/**/*.ts"]
+  "include": ["scripts/**/*.ts", "tests/**/*.ts", "web/**/*.ts", "web/**/*.tsx"]
 }

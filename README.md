@@ -53,9 +53,10 @@ Use Linux x86_64 with these tools:
 - Python 3.10 or newer for the upstream action wrapper.
 - Git, Flatpak, GNU `timeout`, and Docker with privileged-container access.
 
-Node runs the TypeScript files without a build step. Zod validates JSON at
-runtime and supplies the TypeScript types. TypeScript, Node type definitions,
-and Prettier are development dependencies.
+Node runs the runner and reporter TypeScript files without a build step. Zod
+validates JSON at runtime and supplies the TypeScript types. The results frontend
+uses React, Vite, Tailwind CSS, and shadcn/Radix; its dependencies are development
+dependencies used by the static-site build. App and report jobs install only Zod.
 
 Allow several GB of disk space and downloads per app. The screenshot image
 includes a desktop environment.
@@ -196,6 +197,33 @@ installs runtime dependencies in app and report jobs.
 
 Actions handles app concurrency, and the local commands run in sequence. Node's
 built-in process handling and test runner cover the current needs without Effect.
+
+### Results frontend
+
+`web/src/` contains the React page and shadcn components. `web/scripts/prepare.ts`
+validates the existing report records and copies bounded screenshot evidence;
+`web/scripts/build.ts` builds Vite assets and prerenders the page with escaped
+embedded props. Fonts are bundled locally. Results, native disclosures, and image
+links work without JavaScript. Hydration adds live freshness, Radix disclosures,
+and a keyboard-accessible image viewer.
+The light and dark palettes follow the system preference, including without
+JavaScript. The Appearance selector can save an explicit light/dark override.
+
+```sh
+# Hot-reloading frontend (starts with the empty report state)
+pnpm dev
+
+# Build downloaded Actions artifacts into site/, then preview that build
+pnpm site --report downloads/report/report.json --artifacts downloads --output site
+pnpm preview
+```
+
+The artifacts directory should contain `health-<app-id>/` diagnostics folders.
+Set `GITHUB_RUN_ID` when building to link diagnostics to a specific workflow run.
+Assets use relative URLs for GitHub Pages project paths. `pnpm test` includes a
+production build, prerendering and escaping checks, freshness boundaries, and
+evidence limits. The frontend consumes the existing report contract; page props
+are build output, not a history storage format.
 
 ## Adding an app
 
