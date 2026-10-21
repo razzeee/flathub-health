@@ -70,6 +70,7 @@ interface Invocation {
   mode: Mode;
   image: string;
   runnerVersion?: string;
+  runnerImageName?: string;
   bundle: string;
   output: string;
   runner: string;
@@ -84,6 +85,7 @@ export const invoke: Invoker = async ({
   mode,
   image,
   runnerVersion,
+  runnerImageName,
   bundle,
   output,
   runner,
@@ -140,7 +142,7 @@ export const invoke: Invoker = async ({
     recipe: phaseMetadata?.recipe ?? null,
     runner_image: {
       version: runnerVersion ?? loadRunner(ROOT).version,
-      image: image.split("@")[0]!,
+      image: runnerImageName ?? image.split("@")[0]!,
       digest: image.split("@")[1] ?? null,
     },
   };
@@ -337,6 +339,7 @@ export async function runApp(
           mode,
           image,
           runnerVersion: config.version,
+          runnerImageName: config[`${mode}_image`],
           bundle,
           output,
           runner,
