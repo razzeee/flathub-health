@@ -65,10 +65,20 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --prod --frozen-lockfile
+      - name: Begin app-check resource measurement
+        id: measurement
+        env:
+          APP_ID: ${{ matrix.app_id }}
+        run: node scripts/measure.ts start "$APP_ID"
       - name: Check released app and capture recipe
         env:
           APP_ID: ${{ matrix.app_id }}
         run: node scripts/run.ts --app "$APP_ID"
+      - name: Record app-check resource measurement
+        if: always() && steps.measurement.outcome == 'success'
+        env:
+          APP_ID: ${{ matrix.app_id }}
+        run: node scripts/measure.ts finish "$APP_ID"
       - name: Upload logs and images
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

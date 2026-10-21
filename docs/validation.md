@@ -14,6 +14,13 @@ that VLC actual-media screenshot completion remains unverified because of
 window-selection/focus failures; this pin does not alter downstream recipes.
 The workflow remains manual-only pending failure-isolation validation.
 
+On 2026-10-21, Firefox and GIMP were added directly at the user's request as
+startup-only catalog entries, bringing the matrix to seven apps. Neither has a
+screenshot recipe or a hosted startup result from this change. Runtime,
+download, and artifact costs remain unmeasured; issue #7's budget decision is
+still pending. This addition does not establish completion of issue #12's
+hosted-validation and measured-budget gates.
+
 The previous pin, v0.2.0 at `65fc5d65e02bbf18812d3b9e56ddaa172242e415`, had a
 successful hosted run on all five apps:
 [39441598891](https://github.com/razzeee/flathub-health/actions/runs/39441598891).
@@ -35,11 +42,12 @@ pnpm test
 node scripts/catalog.ts
 ```
 
-All 37 tests pass with Node 24.22.0 and pnpm 12.6.0. They cover catalog validation, failure classification,
+All 38 tests pass locally. They cover catalog validation, failure classification,
 timeouts, process-group cleanup, cancellation, logs, path containment, and
 reporting with failed or missing artifacts. They also verify that a missing
 screenshot image preserves startup results and that apps without recipes skip
-screenshot preparation. The matrix contains five apps.
+screenshot preparation. The current matrix contains seven apps; the five-app
+hosted evidence below predates the Firefox and GIMP additions.
 Configuration tests check release/image tag consistency, parse the workflow's
 revision output and checkout wiring, and execute the revision-output step locally.
 Phase tests check unavailable images in either direction, invalid repository

@@ -60,7 +60,7 @@ function record(selected = app()): Health {
   };
 }
 
-test("five-app catalog and job matrix", () => {
+test("seven-app catalog and job matrix", () => {
   const apps = load();
   assert.deepEqual(
     apps.map(({ app_id }) => app_id),
@@ -70,6 +70,8 @@ test("five-app catalog and job matrix", () => {
       "com.vscodium.codium",
       "org.videolan.VLC",
       "org.libreoffice.LibreOffice",
+      "org.mozilla.firefox",
+      "org.gimp.GIMP",
     ],
   );
   assert.ok(
@@ -78,6 +80,19 @@ test("five-app catalog and job matrix", () => {
   assert.deepEqual(matrix(apps), {
     include: apps.map(({ app_id }) => ({ app_id })),
   });
+});
+
+test("Firefox and GIMP remain startup-only with pending hosted validation", () => {
+  for (const id of ["org.mozilla.firefox", "org.gimp.GIMP"]) {
+    const entry = load().find(({ app_id }) => app_id === id);
+    assert.ok(entry);
+    assert.equal(entry.recipe, undefined);
+    assert.match(entry.limitations, /Startup-only/);
+    assert.match(
+      entry.limitations,
+      /hosted validation and cost measurement are pending/,
+    );
+  }
 });
 
 test("catalog rejects invalid fields, IDs, branches, architectures and recipes", (t) => {
