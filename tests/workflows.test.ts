@@ -11,6 +11,7 @@ interface Step {
   uses?: string;
   run?: string;
   with?: Record<string, unknown>;
+  env?: Record<string, unknown>;
   if?: string;
   "continue-on-error"?: boolean;
 }
@@ -195,9 +196,49 @@ test("hosted failure fixtures require explicit confirmation and stay outside the
       ],
     false,
   );
+  assert.deepEqual(
+    (
+      fixture.jobs["hosted-fixtures"]!.strategy as {
+        matrix: { case: string[] };
+      }
+    ).matrix.case,
+    [
+      "recipe-failure",
+      "unaffected-matrix",
+      "missing-artifact",
+      "installation-failure",
+      "cancellation-cleanup",
+    ],
+  );
   const steps = fixture.jobs["hosted-fixtures"]!.steps;
   assert.ok(steps.some((step) => step.name?.includes("fixture evidence")));
   assert.ok(steps.every((step) => !step.run?.includes("scripts/run.ts")));
+  const executableFixture = steps.find(
+    (step) => step.run === "node scripts/hosted-fixture.ts",
+  );
+  assert.equal(
+    executableFixture?.if,
+    "matrix.case == 'installation-failure' || matrix.case == 'cancellation-cleanup'",
+  );
+  assert.equal(executableFixture?.env?.CASE, "${{ matrix.case }}");
+  const fixtureSource = readFileSync(
+    join(ROOT, "scripts/hosted-fixture.ts"),
+    "utf8",
+  );
+  assert.match(fixtureSource, /infrastructure_failed/);
+  assert.match(fixtureSource, /status !== "incomplete"/);
+  assert.match(fixtureSource, /docker.*rm.*--force/s);
+  assert.match(fixtureSource, /fixture_container_removed=true/);
+  const verification = fixture.jobs["verify-fixtures"]!.steps.find((step) =>
+    step.name?.includes("Confirm unaffected"),
+  );
+  assert.match(verification!.run!, /unaffected-matrix\.txt/);
+  assert.match(
+    verification!.run!,
+    /test ! -e fixture-downloads\/hosted-fixture-missing-artifact/,
+  );
+  assert.match(verification!.run!, /hosted-fixture-installation-failure/);
+  assert.match(verification!.run!, /hosted-fixture-cancellation-cleanup/);
   assert.equal(
     fixture.jobs["verify-fixtures"]!.if,
     "${{ always() && inputs.confirm == 'RUN HOSTED FAILURE TEST' }}",

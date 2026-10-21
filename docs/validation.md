@@ -22,6 +22,18 @@ complete report uploaded. The opt-in [failure-isolation fixture run 39579256859]
 passed, but is not real privileged-container cleanup validation. The workflow
 now includes main's daily schedule; these additions do not change its timing.
 
+Issue #4's follow-up opt-in workflow adds deterministic installation-failure and
+Docker cancellation fixtures. Installation failure runs through `runApp` and
+checks that preparation is classified as `infrastructure_failed` while later
+phases remain `incomplete` in the saved health record. Cancellation starts a
+uniquely named disposable container, interrupts a Docker log-follow subprocess,
+and removes the fixture container in `finally`; it does not run the pinned
+flatpak-smoke workload. Therefore it demonstrates hosted cancellation signaling
+and cleanup of a disposable container, but does not prove behavior when GitHub
+force-cancels the whole job or verify flatpak-smoke's internal container cleanup.
+If Docker is unavailable, the cancellation fixture fails rather than silently
+passing. Neither case enters `apps.json` or `artifacts/`.
+
 On 2026-10-21, Firefox and GIMP were added directly at the user's request as
 startup-only catalog entries, bringing the matrix to seven apps. Neither has a
 screenshot recipe. [Hosted run 39585913867](https://github.com/razzeee/flathub-health/actions/runs/39585913867)
