@@ -1,11 +1,14 @@
 version: 1
 window:
+  title: sample.odt — LibreOffice Writer
   width: 900
   height: 650
 setup:
   files:
     - source: fixtures/org.libreoffice.LibreOffice/sample.odt
       destination: data/documents/sample.odt
+    - source: fixtures/org.libreoffice.LibreOffice/registrymodifications.xcu
+      destination: config/libreoffice/4/user/registrymodifications.xcu
 launch:
   args:
     - --writer

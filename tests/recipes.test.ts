@@ -107,6 +107,7 @@ test("LibreOffice recipe seeds and opens the licensed sample document", () => {
   assert.deepEqual(parsed.errors, []);
   const recipe = z
     .object({
+      window: z.object({ title: z.string() }),
       setup: z.object({
         files: z.array(
           z.object({ source: z.string(), destination: z.string() }),
@@ -124,12 +125,29 @@ test("LibreOffice recipe seeds and opens the licensed sample document", () => {
     })
     .parse(parsed.toJS());
 
+  assert.equal(recipe.window.title, "sample.odt — LibreOffice Writer");
   assert.deepEqual(recipe.setup.files, [
     {
       source: "fixtures/org.libreoffice.LibreOffice/sample.odt",
       destination: "data/documents/sample.odt",
     },
+    {
+      source: "fixtures/org.libreoffice.LibreOffice/registrymodifications.xcu",
+      destination: "config/libreoffice/4/user/registrymodifications.xcu",
+    },
   ]);
+  const profile = readFileSync(
+    join(ROOT, "recipes", recipe.setup.files[1]!.source),
+    "utf8",
+  );
+  assert.match(
+    profile,
+    /oor:path="\/org\.openoffice\.Setup\/Product"[\s\S]*oor:name="WhatsNew"[^>]*>\s*<value>false<\/value>/,
+  );
+  assert.match(
+    profile,
+    /oor:path="\/org\.openoffice\.Office\.Common\/Misc"[\s\S]*oor:name="ShowTipOfTheDay"[^>]*>\s*<value>false<\/value>/,
+  );
   assert.deepEqual(recipe.launch.args, [
     "--writer",
     "${APP_DATA}/documents/sample.odt",
