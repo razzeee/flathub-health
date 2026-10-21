@@ -19,7 +19,7 @@ import { ROOT, readJson, writeJson } from "../scripts/io.ts";
 import type { App, Health } from "../scripts/model.ts";
 import { command, CommandError } from "../scripts/process.ts";
 import type { Executor } from "../scripts/process.ts";
-import { aggregate, render } from "../scripts/report.ts";
+import { aggregate, compare, render, snapshots } from "../scripts/report.ts";
 import { classify, invoke, runApp } from "../scripts/run.ts";
 import { loadRunner } from "../scripts/runner.ts";
 
@@ -791,4 +791,80 @@ test("artifact schemas reject malformed metadata, phase outcomes, and version de
     writeJson(join(path, "health.json"), raw);
     assert.ok("error" in aggregate([app()], root)[0]!);
   }
+});
+
+test("bounded history compares startup and recipe independently and reports environment changes", (t) => {
+  const current = record();
+  current.phases.verify = { status: "app_failed" };
+  current.phases.screenshots = { status: "passed" };
+  current.runner.revision = "c".repeat(40);
+  const previous = record();
+  previous.phases.verify = { status: "passed" };
+  previous.phases.screenshots = { status: "recipe_failed" };
+  const changes = compare(
+    [current],
+    [
+      {
+        schema_version: 1,
+        run_id: "1",
+        run_attempt: "1",
+        rows: [previous],
+      },
+    ],
+  );
+  assert.ok(changes.some((line) => line.includes("startup: newly failing")));
+  assert.ok(changes.some((line) => line.includes("recipe: recovered")));
+  assert.ok(
+    changes.some((line) => line.includes("environment/version changed")),
+  );
+  assert.ok(
+    compare([current], []).some((line) =>
+      line.includes("comparison unavailable"),
+    ),
+  );
+  const missing = {
+    ...current,
+    phases: { ...current.phases, verify: { status: "incomplete" as const } },
+  };
+  assert.ok(
+    compare(
+      [missing],
+      [{ schema_version: 1, run_id: "1", run_attempt: "1", rows: [previous] }],
+    ).some((line) => line.includes("comparison unavailable")),
+  );
+  const infrastructure = {
+    ...current,
+    phases: {
+      ...current.phases,
+      verify: { status: "infrastructure_failed" as const },
+    },
+  };
+  assert.ok(
+    compare(
+      [infrastructure],
+      [{ schema_version: 1, run_id: "1", run_attempt: "1", rows: [previous] }],
+    ).some((line) => line.includes("comparison unavailable")),
+  );
+  const root = temporary(t);
+  writeJson(join(root, "valid.json"), {
+    schema_version: 1,
+    run_id: "12",
+    run_attempt: "1",
+    rows: [previous],
+  });
+  writeJson(join(root, "future.json"), {
+    schema_version: 2,
+    run_id: "13",
+    run_attempt: "1",
+    rows: [previous],
+  });
+  const retained = snapshots(root);
+  assert.deepEqual(
+    retained.map(({ run_id }) => run_id),
+    ["13", "12"],
+  );
+  assert.match(
+    compare([current], retained)[0]!,
+    /unsupported history schema 2/,
+  );
 });

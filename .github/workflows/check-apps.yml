@@ -3,6 +3,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
@@ -66,13 +67,23 @@ jobs:
         env:
           APP_ID: ${{ matrix.app_id }}
         run: node scripts/run.ts --app "$APP_ID"
-      - name: Upload all diagnostics
+      - name: Upload logs and images
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: health-${{ matrix.app_id }}
-          path: artifacts/${{ matrix.app_id }}/
+          path: |
+            artifacts/${{ matrix.app_id }}/
+            !artifacts/${{ matrix.app_id }}/health.json
           if-no-files-found: error
+          retention-days: 14
+      - name: Upload compact result record
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: record-${{ matrix.app_id }}
+          path: artifacts/${{ matrix.app_id }}/health.json
+          if-no-files-found: warn
           retention-days: 14
 
   report:
@@ -93,7 +104,7 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         continue-on-error: true # aggregator must report missing jobs
         with:
-          pattern: health-*
+          pattern: "{health-*,record-*}"
           path: downloads
       - name: Restore app directory names
         run: |
@@ -102,8 +113,30 @@ jobs:
             [ -d "$dir" ] || continue
             mv "$dir" "artifacts/${dir#downloads/health-}"
           done
+          for dir in downloads/record-*; do
+            [ -d "$dir" ] || continue
+            app_id=${dir#downloads/record-}
+            mkdir -p "artifacts/$app_id"
+            [ ! -f "$dir/health.json" ] || cp "$dir/health.json" "artifacts/$app_id/health.json"
+          done
+      - name: Download recent retained result records
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          CURRENT_RUN: ${{ github.run_id }}
+        run: |
+          mkdir -p downloads/history
+          gh run list --workflow check-apps.yml --limit 31 --json databaseId,status --jq '.[] | select(.status == "completed") | .databaseId' | while read -r run_id; do
+            [ "$run_id" = "$CURRENT_RUN" ] && continue
+            attempt=$(gh api "repos/$GH_REPO/actions/runs/$run_id" --jq .run_attempt)
+            mkdir -p "downloads/history/$run_id"
+            gh run download "$run_id" --repo "$GH_REPO" --name "history-$run_id-$attempt" --dir "downloads/history/$run_id" 2>/dev/null || printf '{"schema_version":1,"run_id":"%s","run_attempt":"%s","missing":true}\n' "$run_id" "$attempt" > "downloads/history/$run_id/missing.json"
+          done
       - name: Aggregate expected jobs
-        run: node scripts/report.ts
+        env:
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: node scripts/report.ts --history downloads/history
       - name: Job summary
         if: always()
         run: cat artifacts/report/summary.md >> "$GITHUB_STEP_SUMMARY"
@@ -112,5 +145,12 @@ jobs:
         with:
           name: health-report
           path: artifacts/report/
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: history-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/report/history.json
           if-no-files-found: error
           retention-days: 14
