@@ -79,7 +79,7 @@ test("GIMP captures only after selecting the editor and observing its menus", ()
       join(ROOT, "recipes", recipe.setup.files[0].source),
       "utf8",
     ).trim(),
-    "(show-welcome-dialog no)",
+    '(show-welcome-dialog no)\n(config-version "3.2.6")',
     "only dismiss the welcome dialog; keep normal plug-in startup and splash",
   );
   assert.deepEqual(recipe.launch.args, [
