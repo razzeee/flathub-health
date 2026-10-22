@@ -268,3 +268,7 @@ selection in [the catalog notes](docs/catalog-selection.md). Keep the catalog
 small until hosted tests establish its runtime and download costs.
 
 The workflow does not publish listing screenshots or file upstream issues.
+
+# Runner integration
+
+See [v0.5.0 feature coverage and validation](docs/flatpak-smoke-v0.5.0.md) for dependency snapshots, execution diagnostics, failure attribution, and recipe-input provenance.

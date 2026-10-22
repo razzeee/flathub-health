@@ -35,18 +35,31 @@ const statusSchema = z.enum([
   "not_requested",
 ]);
 export type Status = z.infer<typeof statusSchema>;
+const recipeMetadataSchema = z.strictObject({
+  content_hash: line,
+  input_digest: line.nullable().optional(),
+});
+// Keep wrapper diagnostics separate from the CLI verdict, including future fields.
+export const executionSchema = z.looseObject({
+  schema_version: z.literal(1),
+  status: line,
+  exit_code: z.number().int().nullable(),
+  cleanup: z.record(z.string(), z.looseObject({ status: line })).nullable(),
+});
 export const outcomeSchema = z.strictObject({
   status: statusSchema,
   message: z.string().optional(),
   exit_code: z.number().int().nullable().optional(),
   reason: z.string().optional(),
+  category: z.string().nullable().optional(),
+  execution: executionSchema.optional(),
   metadata: z
     .strictObject({
       app: z.strictObject({ ref: line, commit: line.nullable() }).nullable(),
       runtimes: z
         .array(z.strictObject({ ref: line, commit: line.nullable() }))
         .nullable(),
-      recipe: z.strictObject({ content_hash: line }).nullable(),
+      recipe: recipeMetadataSchema.nullable(),
       runner_image: z.strictObject({
         version: line,
         image: line,
@@ -151,7 +164,7 @@ const upstreamFields = {
         .array(z.object({ ref: line, commit: line.nullable() }))
         .nullable()
         .optional(),
-      recipe: z.object({ content_hash: line }).nullable().optional(),
+      recipe: recipeMetadataSchema.strip().nullable().optional(),
     })
     .optional(),
 };
@@ -164,7 +177,11 @@ export const upstreamResultSchema = z.discriminatedUnion("status", [
   z.object({
     ...upstreamFields,
     status: z.literal("failed"),
-    failure: z.object({ reason: line, message: z.string().optional() }),
+    failure: z.object({
+      reason: line,
+      message: z.string().optional(),
+      category: z.string().nullable().optional(),
+    }),
   }),
 ]);
 export interface MissingHealth {

@@ -87,6 +87,9 @@ export function render(rows: ReportRow[]): string {
         `- ${phase} runtimes: ${cell(metadata?.runtimes?.length ? metadata.runtimes.map((runtime) => `${runtime.ref} (commit ${runtime.commit ?? "unavailable"})`).join(", ") : "unavailable")}`,
         `- ${phase} runner image: ${cell(imageVersion ?? "unavailable")} (${cell(image ?? "unavailable")}; digest ${cell(imageDigest ?? "unavailable")})`,
         `- ${phase} recipe content hash: ${cell(metadata?.recipe?.content_hash ?? "unavailable")}`,
+        `- ${phase} recipe input digest: ${cell(metadata?.recipe?.input_digest ?? "unknown")}`,
+        `- ${phase} failure category: ${cell(row.phases[phase].category ?? "unclassified")}`,
+        `- ${phase} wrapper execution: ${cell(row.phases[phase].execution ? JSON.stringify(row.phases[phase].execution) : "unavailable")}`,
       );
       if (row.phases[phase].message)
         lines.push(`- ${phase}: ${cell(row.phases[phase].message)}`);
@@ -199,6 +202,9 @@ export function compare(current: ReportRow[], previous: Snapshot[]): string[] {
       const recipeVersions = (health: Health) =>
         JSON.stringify({
           contentHash: health.phases.screenshots.metadata?.recipe?.content_hash,
+          inputDigest:
+            health.phases.screenshots.metadata?.recipe?.input_digest ??
+            "unknown",
           appCommit: health.phases.screenshots.metadata?.app?.commit,
           runtimes: health.phases.screenshots.metadata?.runtimes,
           runner: health.phases.screenshots.metadata?.runner_image,
@@ -208,6 +214,14 @@ export function compare(current: ReportRow[], previous: Snapshot[]): string[] {
         changes.push(`- ${app} startup environment/version changed`);
       if (recipeVersions(before) !== recipeVersions(row))
         changes.push(`- ${app} recipe environment/version changed`);
+      if (
+        row.app.recipe &&
+        (!before.phases.screenshots.metadata?.recipe?.input_digest ||
+          !row.phases.screenshots.metadata?.recipe?.input_digest)
+      )
+        changes.push(
+          `- ${app} recipe input comparison unavailable (missing fixture-inclusive digest)`,
+        );
     }
   }
   return changes;

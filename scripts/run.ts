@@ -1,5 +1,5 @@
 /** Prepare a released app and run the pinned upstream action. */
-import { mkdirSync, statSync } from "node:fs";
+import { copyFileSync, mkdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { platform, release } from "node:os";
 import { load } from "./catalog.ts";
@@ -14,6 +14,7 @@ import {
 } from "./io.ts";
 import {
   digestSchema,
+  executionSchema,
   message,
   successful,
   upstreamResultSchema,
@@ -51,16 +52,20 @@ export function classify(
   const knownFailure =
     reason !== undefined &&
     (appReasons.has(reason) ||
-      (mode === "screenshots" && reason === "screenshot_failed"));
+      (mode === "screenshots" && failure?.category === "expectation"));
   return {
     status:
-      code !== 0 && parsed.data.status === "failed" && knownFailure
+      code !== 0 &&
+      parsed.data.status === "failed" &&
+      knownFailure &&
+      (failure?.category == null || failure.category === "expectation")
         ? mode === "verify"
           ? "app_failed"
           : "recipe_failed"
         : "infrastructure_failed",
     exit_code: code,
     reason,
+    category: failure?.category,
     message: failure?.message ?? "inconsistent runner exit/result",
   };
 }
@@ -72,6 +77,7 @@ interface Invocation {
   runnerVersion?: string;
   runnerImageName?: string;
   bundle: string;
+  dependencyRepo?: string;
   output: string;
   runner: string;
   env: NodeJS.ProcessEnv;
@@ -87,6 +93,7 @@ export const invoke: Invoker = async ({
   runnerVersion,
   runnerImageName,
   bundle,
+  dependencyRepo,
   output,
   runner,
   env,
@@ -94,7 +101,11 @@ export const invoke: Invoker = async ({
   execute,
 }) => {
   const destination = join(output, mode);
-  if (![bundle, destination].every((path) => beneath(root, canonical(path)))) {
+  if (
+    ![bundle, destination, ...(dependencyRepo ? [dependencyRepo] : [])].every(
+      (path) => beneath(root, canonical(path)),
+    )
+  ) {
     throw new Error("bundle and output must stay beneath the workspace");
   }
   const inputs = {
@@ -104,21 +115,20 @@ export const invoke: Invoker = async ({
     image,
     user: "nobody",
     "allow-network-remotes": "true",
+    ...(dependencyRepo
+      ? { "dependency-repo": relative(root, dependencyRepo) }
+      : {}),
+    "execution-timeout": "420",
+    "cleanup-timeout": "30",
     args: "--overall-timeout 5m",
     ...(mode === "screenshots" ? { recipe: app.recipe } : {}),
   };
   const result = await execute(
-    [
-      "timeout",
-      "--signal=TERM",
-      "--kill-after=30s",
-      "420s",
-      "python3",
-      join(runner, "action/run.py"),
-    ],
+    ["python3", join(runner, "action/run.py")],
     join(output, `${mode}.log`),
     {
       timeoutMs: 480_000,
+      graceMs: 40_000,
       allowFailure: true,
       env: {
         ...env,
@@ -172,7 +182,31 @@ export const invoke: Invoker = async ({
       };
     }
   }
-  return { ...classify(result.code, raw, mode), metadata };
+  const outcome: Outcome = { ...classify(result.code, raw, mode), metadata };
+  try {
+    outcome.execution = executionSchema.parse(
+      readJson(`${destination}.execution.json`),
+    );
+    const execution = outcome.execution;
+    if (
+      outcome.status === "passed" &&
+      (execution.status !== "completed" ||
+        execution.exit_code !== 0 ||
+        !execution.cleanup?.remove ||
+        Object.values(execution.cleanup).some(
+          (item) => !["ok", "absent"].includes(item.status),
+        ))
+    ) {
+      outcome.status = "infrastructure_failed";
+      outcome.message = "runner passed but wrapper execution or cleanup failed";
+    }
+  } catch {
+    if (outcome.status === "passed") {
+      outcome.status = "infrastructure_failed";
+      outcome.message = "missing or invalid wrapper execution record";
+    }
+  }
+  return outcome;
 };
 
 interface RunOptions {
@@ -237,7 +271,7 @@ export async function runApp(
       throw new Error("runner checkout does not match runner.json revision");
     await cmd(["docker", "info"], 30_000);
     const resolveImage = async (mode: Mode) => {
-      const image = config[`${mode}_image`];
+      const image = config[`${mode}_digest`] ?? config[`${mode}_image`];
       await cmd(["docker", "pull", image], 300_000);
       const digests: unknown = JSON.parse(
         await cmd([
@@ -261,6 +295,12 @@ export async function runApp(
       );
       if (!digest.success) {
         throw new Error("image has no matching immutable repository digest");
+      }
+      if (
+        config[`${mode}_digest`] &&
+        digest.data !== config[`${mode}_digest`]
+      ) {
+        throw new Error("image digest does not match runner.json pin");
       }
       config[`${mode}_digest`] = digest.data;
       return digest.data;
@@ -326,6 +366,62 @@ export async function runApp(
       ],
       300_000,
     );
+    // Export complete deployed commits, including extensions. Locale deployments
+    // can be partial: fetch their full objects at the same checksum before export.
+    const runtimeRefs = (
+      await cmd([
+        "flatpak",
+        "list",
+        "--user",
+        "--runtime",
+        "--all",
+        "--columns=ref",
+      ])
+    )
+      .split("\n")
+      .filter(Boolean);
+    for (const runtimeRef of runtimeRefs) {
+      const commit = await cmd([
+        "flatpak",
+        "info",
+        "--user",
+        "--show-commit",
+        runtimeRef,
+      ]);
+      const origin = await cmd([
+        "flatpak",
+        "info",
+        "--user",
+        "--show-origin",
+        runtimeRef,
+      ]);
+      await cmd(
+        [
+          "ostree",
+          `--repo=${join(work, "installation/repo")}`,
+          "pull",
+          origin,
+          commit,
+        ],
+        300_000,
+      );
+    }
+    const dependencyRepo = join(work, "dependencies");
+    await cmd(
+      [
+        "python3",
+        join(runner, "action/prepare-dependencies.py"),
+        "--installation",
+        join(work, "installation"),
+        "--output",
+        dependencyRepo,
+      ],
+      300_000,
+    );
+    copyFileSync(
+      join(dependencyRepo, "inputs.json"),
+      join(output, "dependency-inputs.json"),
+    );
     record.phases.prepare = { status: "passed" };
     save();
     for (const mode of ["verify", "screenshots"] as const) {
@@ -341,6 +437,7 @@ export async function runApp(
           runnerVersion: config.version,
           runnerImageName: config[`${mode}_image`],
           bundle,
+          dependencyRepo,
           output,
           runner,
           env,
