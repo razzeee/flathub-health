@@ -53,7 +53,8 @@
       "name": "GIMP",
       "branch": "stable",
       "arch": "x86_64",
-      "limitations": "Startup-only check in a clean profile. The hosted capture shows GIMP's splash screen, not editor readiness. No screenshot recipe or image fixture. Does not test image loading, editing, saving, exporting, plug-ins, color management, or format compatibility."
+      "recipe": "recipes/org.gimp.GIMP.yml",
+      "limitations": "Startup visibility can pass on the splash screen. The separate recipe selects the empty editor by its English window title and waits for Tools and Filters menus before capture, with the welcome dialog disabled in a fresh profile. Does not test image loading, editing, saving, exporting, plug-in functionality, color management, or format compatibility."
     }
   ]
 }

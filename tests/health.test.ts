@@ -82,20 +82,13 @@ test("seven-app catalog and job matrix", () => {
   });
 });
 
-test("Firefox and GIMP remain startup-only with explicit capture limitations", () => {
-  for (const id of ["org.mozilla.firefox", "org.gimp.GIMP"]) {
-    const entry = load().find(({ app_id }) => app_id === id);
-    assert.ok(entry);
-    assert.equal(entry.recipe, undefined);
-    assert.match(entry.limitations, /Startup-only/);
-    assert.match(entry.limitations, /No screenshot recipe/);
-    assert.match(
-      entry.limitations,
-      id === "org.mozilla.firefox"
-        ? /first-run welcome dialog/
-        : /splash screen, not editor readiness/,
-    );
-  }
+test("Firefox remains startup-only with explicit capture limitations", () => {
+  const entry = load().find(({ app_id }) => app_id === "org.mozilla.firefox");
+  assert.ok(entry);
+  assert.equal(entry.recipe, undefined);
+  assert.match(entry.limitations, /Startup-only/);
+  assert.match(entry.limitations, /No screenshot recipe/);
+  assert.match(entry.limitations, /first-run welcome dialog/);
 });
 
 test("catalog rejects invalid fields, IDs, branches, architectures and recipes", (t) => {

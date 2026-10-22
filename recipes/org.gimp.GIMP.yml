@@ -1,0 +1,17 @@
+version: 1
+window:
+  title: GNU Image Manipulation Program
+  width: 1000
+  height: 700
+setup:
+  files:
+    - source: fixtures/org.gimp.GIMP/gimprc
+      destination: config/GIMP/3.0/gimprc
+steps:
+  - wait_text: Tools
+    timeout: 60s
+  - wait_text: Filters
+    timeout: 60s
+  - capture:
+      name: editor
+      caption: GIMP empty editor after plug-in startup

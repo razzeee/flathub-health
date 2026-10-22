@@ -12,9 +12,11 @@ The catalog has seven apps. Calculator, KCalc, and VSCodium cover GTK, Qt, and
 Electron. Their recipes come from flatpak-smoke's `tests/compatibility/` at the
 revision in `runner.json`. VLC opens a short, silent CC0 test video and
 LibreOffice opens a bundled CC0 Writer document from a clean profile. Firefox
-and GIMP are startup-only additions with no screenshot recipes; both passed
-hosted startup checks. Captures show Firefox's welcome dialog and GIMP's splash
-screen, not web compatibility or editor readiness. Their inclusion was requested
+remains startup-only; its hosted capture shows the welcome dialog. GIMP's separate
+recipe selects the empty editor by title and waits for editor menus before capture.
+Its startup check alone can still pass on the splash screen. See the
+[GIMP recipe notes](recipes/fixtures/org.gimp.GIMP/README.md) for selectors and
+limits. Their inclusion was requested
 directly; budget is not a gate for these additions. See
 [the selection notes](docs/catalog-selection.md) for sources and test limits.
 
