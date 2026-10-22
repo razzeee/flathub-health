@@ -36,6 +36,11 @@ function app(): App {
 }
 
 function exportFixture(args: string[]) {
+  if (args[0] === "ostree") {
+    const repo = args.find((arg) => arg.startsWith("--repo="))!.slice(7);
+    mkdirSync(join(repo, ".."), { recursive: true, mode: 0o700 });
+    mkdirSync(repo, { recursive: true });
+  }
   if (!args[1]?.endsWith("action/prepare-dependencies.py")) return;
   const output = args[args.indexOf("--output") + 1]!;
   mkdirSync(args[args.indexOf("--installation") + 1]!, {
@@ -673,6 +678,36 @@ test("release digests and one dependency snapshot are used by both isolated phas
     join(root, ".health-work", app().app_id, "dependencies"),
     join(root, ".health-work", app().app_id, "dependencies"),
   ]);
+});
+
+test("nested-process apps retain both checks without broken dependency reuse", async (t) => {
+  for (const id of ["org.gimp.GIMP", "com.vscodium.codium"]) {
+    const root = temporary(t);
+    mockRunner(root);
+    const selected = load().find((entry) => entry.app_id === id)!;
+    const modes: string[] = [];
+    const row = await runApp(selected, root, join(root, "artifacts"), {
+      root,
+      execute: async (args) => {
+        assert.ok(!args[1]?.endsWith("prepare-dependencies.py"));
+        exportFixture(args);
+        return {
+          code: 0,
+          stdout:
+            args.at(-1) === "HEAD" ? loadRunner(root).revision : "example",
+        };
+      },
+      invoke: async ({ mode, dependencyRepo, app, repo }) => {
+        modes.push(mode);
+        assert.equal(dependencyRepo, undefined);
+        assert.ok(app.recipe);
+        assert.ok(existsSync(repo));
+        return { status: "passed" };
+      },
+    });
+    assert.equal(row.phases.prepare.status, "passed");
+    assert.deepEqual(modes, ["verify", "screenshots"]);
+  }
 });
 
 test("apps without recipes skip screenshot preparation and report it as not requested", async (t) => {
