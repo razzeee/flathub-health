@@ -11,7 +11,6 @@ launch:
     - --repeat
     - "${APP_DATA}/VLC-smoke-test.mp4"
 window:
-  title: VLC media player
   width: 900
   height: 600
 steps:
