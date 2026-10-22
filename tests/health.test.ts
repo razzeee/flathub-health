@@ -7,6 +7,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -37,6 +38,13 @@ function app(): App {
 function exportFixture(args: string[]) {
   if (!args[1]?.endsWith("action/prepare-dependencies.py")) return;
   const output = args[args.indexOf("--output") + 1]!;
+  mkdirSync(args[args.indexOf("--installation") + 1]!, {
+    recursive: true,
+    mode: 0o700,
+  });
+  mkdirSync(join(args[args.indexOf("--installation") + 1]!, "repo"), {
+    recursive: true,
+  });
   mkdirSync(output, { recursive: true });
   writeJson(join(output, "inputs.json"), { schema_version: 1, runtimes: {} });
 }
@@ -622,7 +630,11 @@ test("release digests and one dependency snapshot are used by both isolated phas
   const row = await runApp(app(), root, join(root, "artifacts"), {
     root,
     execute,
-    invoke: async ({ image, mode, dependencyRepo }) => {
+    invoke: async ({ image, mode, dependencyRepo, repo }) => {
+      assert.ok(
+        statSync(join(repo, "..")).mode & 0o001,
+        "the unprivileged runner must be able to traverse the app installation",
+      );
       assert.equal(image, config[`${mode}_digest`]);
       assert.ok(dependencyRepo);
       snapshots.push(dependencyRepo);

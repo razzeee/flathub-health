@@ -1,5 +1,5 @@
 /** Prepare a released app and run the pinned upstream action. */
-import { copyFileSync, mkdirSync } from "node:fs";
+import { chmodSync, copyFileSync, mkdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import { platform, release } from "node:os";
 import { load } from "./catalog.ts";
@@ -329,6 +329,8 @@ export async function runApp(
       join(dependencyRepo, "inputs.json"),
       join(output, "dependency-inputs.json"),
     );
+    // Flatpak creates this parent as 0700; the container runs as nobody.
+    chmodSync(join(work, "installation"), 0o711);
     record.phases.prepare = { status: "passed" };
     save();
     for (const mode of ["verify", "screenshots"] as const) {
