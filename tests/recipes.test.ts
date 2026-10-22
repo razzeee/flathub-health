@@ -46,6 +46,47 @@ for (const app of load()) {
   });
 }
 
+test("GIMP captures only after selecting the editor and observing its menus", () => {
+  const app = load().find(({ app_id }) => app_id === "org.gimp.GIMP");
+  assert.ok(app?.recipe, "startup visibility alone can accept GIMP's splash");
+  const parsed = parseDocument(readFileSync(join(ROOT, app.recipe), "utf8"), {
+    uniqueKeys: true,
+  });
+  assert.deepEqual(parsed.errors, []);
+  const recipe = parsed.toJS();
+  assert.equal(recipe.window.title, "GNU Image Manipulation Program");
+  const firstCapture = recipe.steps.findIndex(
+    (step: { capture?: unknown }) => step.capture,
+  );
+  assert.ok(firstCapture > 0, "capture must follow editor readiness checks");
+  const readiness = recipe.steps.slice(0, firstCapture);
+  for (const label of ["Tools", "Filters"]) {
+    assert.ok(
+      readiness.some(
+        (step: { wait_text?: string }) => step.wait_text === label,
+      ),
+      `require editor menu ${label}, absent from the startup splash`,
+    );
+  }
+  assert.deepEqual(recipe.setup.files, [
+    {
+      source: "fixtures/org.gimp.GIMP/gimprc",
+      destination: "config/gimp-editor/gimprc",
+    },
+  ]);
+  assert.equal(
+    readFileSync(
+      join(ROOT, "recipes", recipe.setup.files[0].source),
+      "utf8",
+    ).trim(),
+    '(show-welcome-dialog no)\n(config-version "3.2.6")',
+    "only dismiss the welcome dialog; keep normal plug-in startup and splash",
+  );
+  assert.deepEqual(recipe.launch.args, [
+    "--gimprc=${APP_CONFIG}/gimp-editor/gimprc",
+  ]);
+});
+
 test("VLC recipe seeds and opens its redistributable media fixture", () => {
   const recipe = parseDocument(
     readFileSync(join(ROOT, "recipes/org.videolan.VLC.yml"), "utf8"),

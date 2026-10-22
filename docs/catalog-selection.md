@@ -2,12 +2,14 @@
 
 Research checked 2026-10-21 against the official Flathub Popular collection
 and AppStream API. Following the research, the user requested direct
-implementation: Firefox and GIMP are now startup-only entries in `apps.json`.
+implementation: Firefox and GIMP were initially startup-only entries in `apps.json`.
+GIMP now has an [editor-readiness recipe](../recipes/fixtures/org.gimp.GIMP/README.md);
+the startup-only results below remain historical evidence, not editor validation.
 The user clarified that budget is not a concern: issue #7's budget agreement
 and measurements are not gates for issue #12 or these recommendations. Costs
 below are informational, with unknowns explicit; the single-run baseline does
 not establish recurring usage. Hosted startup validation is still required to
-establish compatibility. No unverified screenshot recipes were added.
+establish compatibility.
 
 ## Current catalog and cost evidence
 
@@ -150,7 +152,7 @@ reliability or recurring-cost guarantee. Scheduling is unchanged by this work.
 
 - The catalog now has seven apps. Hosted results establish only visible startup
   windows, not broader functional compatibility or future cost. Manual runs
-  include both startup-only entries.
+  include both additions, with GIMP editor readiness checked separately by recipe.
 - Popularity data supports interest, not test quality or cost. It is a rolling
   aggregate and can change between checks.
 - Exact refs establish identity, not that the refs install successfully or that
@@ -158,9 +160,9 @@ reliability or recurring-cost guarantee. Scheduling is unchanged by this work.
 - The proposed tests are deliberately startup-level. Browser network behavior
   and real-world sites, and image editing or broad format handling, remain
   untested. A fixture must have a documented source and redistribution license.
-- Recipe feasibility and reliable selectors have not been verified. Do not add
-  screenshot recipes until they are checked against the pinned upstream runner;
-  capture-only validation is not a functional test.
+- Firefox recipe feasibility and reliable selectors have not been verified.
+  GIMP's recipe targets its empty editor; capture-only validation is not an
+  image-editing functional test.
 - Issue #12 originally requested separate implementation issues. The user asked
   to implement these apps directly instead; no follow-up GitHub issues were
   created. Hosted startup evidence is recorded above. Budget agreement and repeated
