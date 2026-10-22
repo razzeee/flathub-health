@@ -107,21 +107,28 @@ pre:focus-visible {
 }
 .captures:has(figure:nth-child(3)) figure:first-child {
   grid-row: span 2;
-  position: relative;
+  display: flex;
+  flex-direction: column;
 }
 .captures:has(figure:nth-child(3)) figure:first-child :is(a, button) {
-  position: absolute;
-  inset: 0 0 24px;
+  flex: 1;
   aspect-ratio: auto;
 }
-.captures:has(figure:nth-child(3)) figure:first-child figcaption {
-  position: absolute;
-  bottom: 0;
-  width: 100%;
+.capture-description {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+figcaption {
+  gap: 8px;
+  overflow-wrap: anywhere;
 }
 figcaption svg {
   width: 12px;
   height: 12px;
+  flex-shrink: 0;
 }
 @media (max-width: 760px) {
   .theme-control > span {
@@ -155,11 +162,8 @@ figcaption svg {
     grid-row: auto;
   }
   .captures:has(figure:nth-child(3)) figure:first-child :is(a, button) {
-    position: static;
+    flex: auto;
     height: auto;
     aspect-ratio: 16/10;
-  }
-  .captures:has(figure:nth-child(3)) figure:first-child figcaption {
-    position: static;
   }
 }

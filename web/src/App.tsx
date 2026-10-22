@@ -6,7 +6,7 @@ import { WarningIcon } from "@phosphor-icons/react/dist/ssr/Warning";
 import { XIcon } from "@phosphor-icons/react/dist/ssr/X";
 import { MinusIcon } from "@phosphor-icons/react/dist/ssr/Minus";
 import type { ReportRow, Status } from "../../scripts/model.ts";
-import type { PageData } from "./data.ts";
+import type { Capture, PageData } from "./data.ts";
 import { dateLabel } from "./data.ts";
 import { Badge } from "./components/ui/badge.tsx";
 import {
@@ -59,7 +59,7 @@ function AppResult({
   enhanced,
 }: {
   row: ReportRow;
-  images: string[];
+  images: Capture[];
   runUrl: string;
   index: number;
   enhanced: boolean;

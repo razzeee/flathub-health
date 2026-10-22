@@ -40,8 +40,24 @@ Actions** before the first deployment. The page marks results stale after 36
 hours, updating at expiry and when a browser tab resumes. Without JavaScript,
 freshness is explicitly unverified. Only runs on the default branch publish.
 It shows at most three smoke-test captures per app (2 MiB per
-image, 30 MiB total) from the latest run; the deployment replaces the prior
-published set. Diagnostic artifacts remain in Actions for 14 days. Missing or
+image, 30 MiB total) from the latest run, in startup-then-recipe order. Only
+output images declared by each phase's `result.json` are published; debug
+baselines, OCR images, and diagnostic copies are excluded. Captures are labeled
+with their phase and name. Optional recipe `capture.caption` descriptions come
+from the runner's `screenshots.json` and appear below the image and in its viewer.
+For example:
+
+```yaml
+- capture:
+    name: settings
+    caption: Change VSCodium settings
+```
+
+Captions describe the intended capture, not an additional test assertion. Startup
+images show a first visible window, which may be a welcome dialog or splash screen.
+Missing caption metadata falls back to the capture filename; missing/invalid
+result manifests never fall back to scanning diagnostic images. The deployment
+replaces the prior published set. Diagnostic artifacts remain in Actions for 14 days. Missing or
 invalid reports are shown as unavailable/incomplete, never as passing.
 
 ## Setup
