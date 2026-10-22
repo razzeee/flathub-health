@@ -71,7 +71,7 @@ test("GIMP captures only after selecting the editor and observing its menus", ()
   assert.deepEqual(recipe.setup.files, [
     {
       source: "fixtures/org.gimp.GIMP/gimprc",
-      destination: "config/GIMP/3.0/gimprc",
+      destination: "config/gimp-editor/gimprc",
     },
   ]);
   assert.equal(
@@ -82,7 +82,9 @@ test("GIMP captures only after selecting the editor and observing its menus", ()
     "(show-welcome-dialog no)",
     "only dismiss the welcome dialog; keep normal plug-in startup and splash",
   );
-  assert.equal(recipe.launch, undefined);
+  assert.deepEqual(recipe.launch.args, [
+    "--gimprc=${APP_CONFIG}/gimp-editor/gimprc",
+  ]);
 });
 
 test("VLC recipe seeds and opens its redistributable media fixture", () => {

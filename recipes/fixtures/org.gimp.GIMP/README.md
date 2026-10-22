@@ -2,7 +2,8 @@
 
 `gimprc` is a minimal test configuration authored for this repository. It disables
 the welcome dialog so the empty editor is available without interacting with
-first-run onboarding. GIMP 3.2 still uses the `GIMP/3.0` configuration directory.
+first-run onboarding. The documented `--gimprc` option selects this file explicitly,
+independently of GIMP's versioned default configuration directory.
 The recipe does not suppress the splash, skip plug-in discovery, or sleep for a
 fixed interval.
 
