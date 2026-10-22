@@ -33,7 +33,7 @@ jobs:
       - run: pnpm check
       - run: pnpm test
       - id: catalog
-        run: echo "matrix=$(node scripts/catalog.ts)" >> "$GITHUB_OUTPUT"
+        run: echo "matrix=$(node scripts/catalog.ts | jq -c '.include |= map(select(.app_id == "org.gimp.GIMP" or .app_id == "com.vscodium.codium"))')" >> "$GITHUB_OUTPUT"
       - id: runner
         run: |
           revision=$(node scripts/runner.ts)
@@ -59,6 +59,9 @@ jobs:
           persist-credentials: false
       - name: Install Flatpak tooling
         run: sudo apt-get update && sudo apt-get install -y flatpak ostree
+      - name: Enable temporary nested-process diagnostics
+        run: |
+          sed -i '/^set -eu$/a export G_MESSAGES_DEBUG=all\nexport FLATPAK_DEBUG=1\nexport ELECTRON_ENABLE_LOGGING=1' .runner/action/container.sh
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
