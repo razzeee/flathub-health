@@ -9,6 +9,8 @@ import {
   DialogTrigger,
 } from "./ui/dialog.tsx";
 import { Button } from "./ui/button.tsx";
+import { captureLabel } from "../data.ts";
+import type { Capture } from "../data.ts";
 
 export function Evidence({
   images,
@@ -16,7 +18,7 @@ export function Evidence({
   startupOnly,
   enhanced,
 }: {
-  images: string[];
+  images: Capture[];
   name: string;
   startupOnly: boolean;
   enhanced: boolean;
@@ -33,6 +35,7 @@ export function Evidence({
           : "No screenshots available for this run."}
       </p>
     );
+  const current = images[selected]!;
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <div className="capture-heading">
@@ -43,13 +46,11 @@ export function Evidence({
         </span>
       </div>
       <div className="captures">
-        {images.map((url, index) => {
+        {images.map((capture, index) => {
+          const { url, description } = capture;
+          const label = captureLabel(capture);
           const image = (
-            <img
-              loading="lazy"
-              src={url}
-              alt={`Smoke-test capture ${index + 1} for ${name}`}
-            />
+            <img loading="lazy" src={url} alt={`${name} · ${label}`} />
           );
           return (
             <figure key={url}>
@@ -62,7 +63,7 @@ export function Evidence({
                       opener.current = event.currentTarget;
                       setSelected(index);
                     }}
-                    aria-label={`Open capture ${index + 1} for ${name} at full size`}
+                    aria-label={`Open ${label} for ${name} at full size`}
                   >
                     {image}
                   </button>
@@ -70,15 +71,18 @@ export function Evidence({
               ) : (
                 <a
                   href={url}
-                  aria-label={`Open capture ${index + 1} for ${name} at full size`}
+                  aria-label={`Open ${label} for ${name} at full size`}
                 >
                   {image}
                 </a>
               )}
               <figcaption>
-                <span>CAPTURE {String(index + 1).padStart(2, "0")}</span>
+                <span>{label}</span>
                 <ArrowUpRightIcon aria-hidden="true" />
               </figcaption>
+              {description ? (
+                <p className="capture-description">{description}</p>
+              ) : null}
             </figure>
           );
         })}
@@ -93,16 +97,17 @@ export function Evidence({
       >
         <DialogHeader>
           <DialogTitle>
-            {name} · Capture {selected + 1}
+            {name} · {captureLabel(current)}
           </DialogTitle>
           <DialogDescription>
-            Smoke-test evidence, not an app-store screenshot.
+            {current.description ??
+              "Smoke-test evidence, not an app-store screenshot."}
           </DialogDescription>
         </DialogHeader>
         <img
           className="max-h-[65dvh] w-full object-contain"
-          src={images[selected]}
-          alt={`Full-size smoke-test capture ${selected + 1} for ${name}`}
+          src={current.url}
+          alt={`${name} · ${captureLabel(current)}`}
         />
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex gap-2">
@@ -122,7 +127,7 @@ export function Evidence({
             </Button>
           </div>
           <Button asChild variant="link">
-            <a href={images[selected]}>
+            <a href={current.url}>
               Original image <ArrowUpRightIcon data-icon="inline-end" />
             </a>
           </Button>

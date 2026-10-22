@@ -1,9 +1,20 @@
-import type { ReportRow } from "../../scripts/model.ts";
+import type { Mode, ReportRow } from "../../scripts/model.ts";
+
+export interface Capture {
+  url: string;
+  phase: Mode;
+  name: string;
+  description?: string;
+}
+
+export function captureLabel(capture: Capture): string {
+  return `${capture.phase === "verify" ? "Startup" : "Recipe"} · ${capture.name}`;
+}
 
 /** Ephemeral page props, derived from #8's report; not a history format. */
 export interface PageData {
   rows: ReportRow[];
-  images: Record<string, string[]>;
+  images: Record<string, Capture[]>;
   runUrl: string;
 }
 
