@@ -33,7 +33,7 @@ jobs:
       - run: pnpm check
       - run: pnpm test
       - id: catalog
-        run: echo "matrix=$(node scripts/catalog.ts | jq -c '.include |= map(select(.app_id == "org.gimp.GIMP" or .app_id == "com.vscodium.codium"))')" >> "$GITHUB_OUTPUT"
+        run: echo "matrix=$(node scripts/catalog.ts)" >> "$GITHUB_OUTPUT"
       - id: runner
         run: |
           revision=$(node scripts/runner.ts)
