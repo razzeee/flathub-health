@@ -1,0 +1,25 @@
+# flatpak-smoke v0.5.0 integration
+
+Baseline: GitHub main `dc8bf88`, v0.4.2 (`779736cabe5288531465ceeec5d6ed5e1c3921d6`). No open consumer PRs when work started. The only intervening release is [v0.5.0](https://github.com/razzeee/flatpak-smoke/releases/tag/v0.5.0), published 2026-10-22 16:45:29 UTC. Inventory checked against the [complete source comparison](https://github.com/razzeee/flatpak-smoke/compare/v0.4.2...v0.5.0), not only release highlights.
+
+## Feature coverage
+
+- **Source and images:** pin release revision `66bbd6723e1f3d5a032441c615e491369fa80093` and both published image digests in `runner.json`. Pull by digest and verify the inspected repository digest; retain human-readable release tags in provenance.
+- **Reusable dependency repository:** after host installation, fetch complete objects for each deployed runtime/extension checksum (including partial Locale deployments), then use upstream `action/prepare-dependencies.py` to atomically export a new snapshot. Both phases receive the same read-only `dependency-repo`; each still gets a private installation/profile. `dependency-inputs.json` records the available set; each phase's runtime metadata records the selected set. Install OSTree on hosted runners.
+- **Dependency limitations:** allow network fallback for backend-specific extensions absent from host preparation (for example KDE Wayland decorations). This is not a complete offline dependency lock or an equivalent-input speed benchmark. Actual selected commits remain authoritative; missing optional extensions can still be skipped. No shared writable installation, cross-job cache, or cache transport is introduced. The existing `repo` + `app-ref` alternative is not needed: this consumer already freezes its app in a bundle; a host installation repository is not a published app repository.
+- **Wrapper deadlines and cleanup:** use action execution/cleanup budgets of 420/30 seconds, with the CLI's 5-minute budget inside and a 480-second process deadline outside. External cancellation allows 40 seconds for wrapper cleanup. Retain sibling `verify.execution.json` / `screenshots.execution.json` in existing uploads and parsed diagnostics in compact records/reports. A CLI pass with missing/failed wrapper diagnostics or cleanup is not a health pass; specific CLI failures are retained alongside cleanup evidence.
+- **Failure categories:** preserve optional/null/future `failure.category`. Known infrastructure categories override app/recipe attribution; `expectation` maps to recipe failure without claiming the app is broken. A bare unclassified `screenshot_failed` is conservatively infrastructure/unassessed, not automatically a recipe regression. Existing specific app reasons retain their phase attribution. Unknown categories do not imply app failure.
+- **Seeded input provenance:** retain YAML-only `content_hash` and nullable/versioned `input_digest`; report both and include fixture-inclusive digest in history comparisons. Old artifacts remain readable; missing digests are explicitly unknown, never proof of unchanged fixtures.
+- **VLC focus and first-run modals:** inherit bounded exact-window focus readiness and transient-modal ancestry fixes. Explicitly suppress VLC's privacy prompt and metadata-network access in the recipe; keep the media filename OCR condition and actual video fixture, with no `--play-and-exit`. No focus/window-ownership checks are relaxed.
+- **Publication guards:** inherit nonblank/pointer-excluding capture validation (already introduced in v0.4.2) and stability fixes. Existing consumer gallery tests publish only declared captures, never diagnostic candidates. Pixel variation or a visible window does not prove application readiness.
+- **Upstream-only regression changes:** nested-modal helper tests and asynchronous exit fixture attribution are upstream test coverage; no matching consumer implementation is needed. Their runtime fixes arrive through the pinned images.
+
+## Readiness boundaries
+
+GIMP's editor recipe and welcome suppression already landed in #42; retain its English title plus Tools/Filters assertions. Its startup phase can still pass on a plug-in splash. Firefox remains explicitly startup-only, with a first-run welcome capture, not a verified web page. Neither app gains a new readiness claim from this release. VLC media success requires hosted content evidence; a filename/title alone is insufficient to establish visible playback.
+
+## Validation
+
+Local checks and hosted run/screenshot evidence are recorded in the PR and appended here when available. Hosted branch dispatches do not publish production Pages. All app/recipe/infrastructure failures remain visible in reports even when other phases succeed.
+
+Upstream references: [dependency contract](https://github.com/razzeee/flatpak-smoke/blob/v0.5.0/docs/reusable-dependencies.md), [results and wrapper contract](https://github.com/razzeee/flatpak-smoke/blob/v0.5.0/docs/reference.md), [VLC focus diagnosis](https://github.com/razzeee/flatpak-smoke/blob/v0.5.0/docs/vlc-capture-focus.md).

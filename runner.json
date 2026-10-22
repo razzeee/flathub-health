@@ -1,6 +1,8 @@
 {
-  "version": "v0.4.2",
-  "revision": "779736cabe5288531465ceeec5d6ed5e1c3921d6",
-  "verify_image": "ghcr.io/razzeee/flatpak-smoke:v0.4.2",
-  "screenshots_image": "ghcr.io/razzeee/flatpak-smoke-screenshots:v0.4.2"
+  "version": "v0.5.0",
+  "revision": "66bbd6723e1f3d5a032441c615e491369fa80093",
+  "verify_image": "ghcr.io/razzeee/flatpak-smoke:v0.5.0",
+  "screenshots_image": "ghcr.io/razzeee/flatpak-smoke-screenshots:v0.5.0",
+  "verify_digest": "ghcr.io/razzeee/flatpak-smoke@sha256:3d40bd3cefd93ba8f06ee27fbd3db244ef18a4dcc90b74b9f68f37950c2be532",
+  "screenshots_digest": "ghcr.io/razzeee/flatpak-smoke-screenshots@sha256:9770b4471fe0e20e764b9974cf4dc00e5e65f9bdd83b54a42906f2ee6f4618a5"
 }

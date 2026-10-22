@@ -34,6 +34,20 @@ function app(): App {
   return load()[0]!;
 }
 
+function exportFixture(args: string[]) {
+  if (!args[1]?.endsWith("action/prepare-dependencies.py")) return;
+  const output = args[args.indexOf("--output") + 1]!;
+  mkdirSync(output, { recursive: true });
+  writeJson(join(output, "inputs.json"), { schema_version: 1, runtimes: {} });
+}
+
+function mockRunner(root: string) {
+  const config = loadRunner(ROOT);
+  delete config.verify_digest;
+  delete config.screenshots_digest;
+  writeJson(join(root, "runner.json"), config);
+}
+
 function record(selected = app()): Health {
   return {
     schema_version: 1,
@@ -249,6 +263,36 @@ test("runner configuration schema rejects malformed and unknown fields", (t) => 
   assert.deepEqual(loadRunner(root), config);
 });
 
+test("capture categories never turn infrastructure or unclassified captures into recipe failures", () => {
+  for (const [category, expected] of [
+    ["infrastructure", "infrastructure_failed"],
+    ["expectation", "recipe_failed"],
+    [null, "infrastructure_failed"],
+    [undefined, "infrastructure_failed"],
+    ["future-category", "infrastructure_failed"],
+  ] as const) {
+    const raw = {
+      schema_version: 1,
+      status: "failed",
+      failure: { reason: "screenshot_failed", category },
+    };
+    assert.equal(classify(1, raw, "screenshots").status, expected);
+    assert.equal(classify(1, raw, "screenshots").category, category);
+  }
+  assert.equal(
+    classify(
+      1,
+      {
+        schema_version: 1,
+        status: "failed",
+        failure: { reason: "window_timeout", category: "infrastructure" },
+      },
+      "screenshots",
+    ).status,
+    "infrastructure_failed",
+  );
+});
+
 test("runner release images and workflow checkout use consistent configuration", async (t) => {
   const config = loadRunner(ROOT);
   assert.match(config.version, /^v\d+\.\d+\.\d+$/);
@@ -443,21 +487,24 @@ test("preparation failures are saved and existing artifacts are never overwritte
 
 test("failed startup still runs the recipe, with immutable images", async (t) => {
   const root = temporary(t);
-  cpSync(join(ROOT, "runner.json"), join(root, "runner.json"));
+  mockRunner(root);
   const calls: string[] = [];
-  const execute: Executor = async (args) => ({
-    code: 0,
-    stdout:
-      args.at(-1) === "HEAD"
-        ? loadRunner(root).revision
-        : args.includes("inspect")
-          ? JSON.stringify([
-              `${args[3]!.split(":")[0]}@sha256:${"a".repeat(64)}`,
-            ])
-          : args.includes("--columns=application,version")
-            ? `${app().app_id}\t1.0`
-            : "example",
-  });
+  const execute: Executor = async (args) => {
+    exportFixture(args);
+    return {
+      code: 0,
+      stdout:
+        args.at(-1) === "HEAD"
+          ? loadRunner(root).revision
+          : args.includes("inspect")
+            ? JSON.stringify([
+                `${args[3]!.split(":")[0]}@sha256:${"a".repeat(64)}`,
+              ])
+            : args.includes("--columns=application,version")
+              ? `${app().app_id}\t1.0`
+              : "example",
+    };
+  };
   const row = await runApp(app(), root, join(root, "artifacts"), {
     root,
     execute,
@@ -474,10 +521,11 @@ test("failed startup still runs the recipe, with immutable images", async (t) =>
 
 test("unavailable screenshot image preserves completed startup results", async (t) => {
   const root = temporary(t);
-  cpSync(join(ROOT, "runner.json"), join(root, "runner.json"));
+  mockRunner(root);
   const config = loadRunner(root);
   const calls: string[] = [];
   const execute: Executor = async (args) => {
+    exportFixture(args);
     if (args[1] === "pull" && args[2] === config.screenshots_image) {
       calls.push("screenshots-image");
       throw new Error("screenshot image unavailable");
@@ -516,10 +564,11 @@ test("unavailable screenshot image preserves completed startup results", async (
 for (const failure of ["pull", "digest", "invoke"] as const) {
   test(`startup ${failure} failure does not suppress screenshot preparation`, async (t) => {
     const root = temporary(t);
-    cpSync(join(ROOT, "runner.json"), join(root, "runner.json"));
+    mockRunner(root);
     const config = loadRunner(root);
     const calls: string[] = [];
     const execute: Executor = async (args) => {
+      exportFixture(args);
       if (args[1] === "pull") {
         calls.push(args[2]!);
         if (args[2] === config.verify_image && failure === "pull")
@@ -588,6 +637,74 @@ test("runner checkout mismatch is recorded before any image or app commands", as
   assert.match(row.phases.prepare.message!, /does not match runner.json/);
 });
 
+test("release digests and one dependency snapshot are used by both isolated phases", async (t) => {
+  for (const mismatch of [false, true]) {
+    const root = temporary(t);
+    cpSync(join(ROOT, "runner.json"), join(root, "runner.json"));
+    const config = loadRunner(root);
+    const calls: string[][] = [];
+    const snapshots: string[] = [];
+    const execute: Executor = async (args) => {
+      calls.push(args);
+      exportFixture(args);
+      let stdout = "example";
+      if (args.at(-1) === "HEAD") stdout = config.revision;
+      if (args.includes("inspect"))
+        stdout = JSON.stringify([
+          mismatch
+            ? args[3]!.replace(/sha256:.*/, `sha256:${"a".repeat(64)}`)
+            : args[3],
+        ]);
+      if (args.includes("--columns=ref"))
+        stdout =
+          "org.example.Platform/x86_64/stable\norg.example.Platform.Locale/x86_64/stable";
+      if (args.includes("--show-commit")) stdout = "f".repeat(64);
+      if (args.includes("--show-origin")) stdout = "flathub";
+      return { code: 0, stdout };
+    };
+    const row = await runApp(app(), root, join(root, "artifacts"), {
+      root,
+      execute,
+      invoke: async ({ image, mode, dependencyRepo }) => {
+        assert.equal(image, config[`${mode}_digest`]);
+        assert.ok(dependencyRepo);
+        snapshots.push(dependencyRepo);
+        return { status: "passed" };
+      },
+    });
+    assert.equal(row.phases.prepare.status, "passed");
+    assert.equal(
+      row.phases.verify.status,
+      mismatch ? "infrastructure_failed" : "passed",
+    );
+    assert.equal(
+      row.phases.screenshots.status,
+      mismatch ? "infrastructure_failed" : "passed",
+    );
+    assert.equal(
+      calls.filter((args) => args[1]?.endsWith("prepare-dependencies.py"))
+        .length,
+      1,
+    );
+    assert.equal(
+      calls.filter(
+        (args) => args[0] === "ostree" && args.at(-1) === "f".repeat(64),
+      ).length,
+      2,
+    );
+    assert.ok(
+      existsSync(
+        join(root, "artifacts", app().app_id, "dependency-inputs.json"),
+      ),
+    );
+    if (!mismatch)
+      assert.deepEqual(snapshots, [
+        join(root, ".health-work", app().app_id, "dependencies"),
+        join(root, ".health-work", app().app_id, "dependencies"),
+      ]);
+  }
+});
+
 test("apps without recipes skip screenshot preparation and report it as not requested", async (t) => {
   const { recipe: _recipe, ...startupOnly } = load()[0]!;
   const apps = [startupOnly];
@@ -597,11 +714,12 @@ test("apps without recipes skip screenshot preparation and report it as not requ
   );
   for (const selected of apps) {
     const root = temporary(t);
-    cpSync(join(ROOT, "runner.json"), join(root, "runner.json"));
+    mockRunner(root);
     const config = loadRunner(root);
     const commands: string[][] = [];
     const modes: string[] = [];
     const execute: Executor = async (args) => {
+      exportFixture(args);
       commands.push(args);
       return {
         code: 0,
@@ -659,22 +777,37 @@ test("upstream action invocation validates ref and real screenshot files", async
           commit: "runtime-phase-commit",
         },
       ],
-      recipe: { content_hash: "md5:0123456789abcdef0123456789abcdef" },
+      recipe: {
+        content_hash: "md5:0123456789abcdef0123456789abcdef",
+        input_digest: `v1:sha256:${"c".repeat(64)}`,
+      },
     },
   };
   writeJson(result, raw);
+  writeJson(`${destination}.execution.json`, {
+    schema_version: 1,
+    status: "completed",
+    exit_code: 0,
+    cleanup: { remove: { status: "ok" } },
+  });
   const options = {
     app: app(),
     mode: "verify" as const,
     image: `ghcr.io/razzeee/flatpak-smoke@sha256:${"a".repeat(64)}`,
     bundle: join(root, "app.flatpak"),
+    dependencyRepo: join(root, "dependencies"),
     output,
     runner: join(root, ".runner"),
     env: {},
     root,
     execute: (async (args, _log, opts) => {
-      assert.equal(args[4], "python3");
+      assert.equal(args[0], "python3");
       assert.equal(opts?.allowFailure, true);
+      const inputs = JSON.parse(opts!.env!.FLATPAK_SMOKE_INPUTS!);
+      assert.equal(inputs["dependency-repo"], "dependencies");
+      assert.equal(inputs["execution-timeout"], "420");
+      assert.equal(inputs["cleanup-timeout"], "30");
+      assert.equal(opts?.timeoutMs, 480_000);
       assert.equal(JSON.parse(opts!.env!.FLATPAK_SMOKE_INPUTS!).user, "nobody");
       assert.equal(
         JSON.parse(opts!.env!.FLATPAK_SMOKE_INPUTS!).image,
@@ -694,6 +827,31 @@ test("upstream action invocation validates ref and real screenshot files", async
     raw.phase_metadata.recipe.content_hash,
   );
   assert.match(passed.metadata!.runner_image.digest!, /^sha256:/);
+  assert.equal(
+    passed.metadata?.recipe?.input_digest,
+    raw.phase_metadata.recipe.input_digest,
+  );
+  writeJson(`${destination}.execution.json`, {
+    schema_version: 1,
+    status: "completed",
+    exit_code: 0,
+    cleanup: { remove: { status: "failed", stderr: "denied" } },
+  });
+  const cleanupFailed = await invoke(options);
+  assert.equal(cleanupFailed.status, "infrastructure_failed");
+  assert.equal(cleanupFailed.execution?.cleanup?.remove?.status, "failed");
+  writeJson(result, {
+    schema_version: 1,
+    status: "failed",
+    failure: { reason: "early_exit", message: "app exited" },
+  });
+  const appFailed = await invoke({
+    ...options,
+    execute: async () => ({ code: 1, stdout: "" }),
+  });
+  assert.equal(appFailed.status, "app_failed");
+  assert.equal(appFailed.reason, "early_exit");
+  assert.equal(appFailed.execution?.cleanup?.remove?.status, "failed");
   writeJson(result, { ...raw, app_ref: "wrong" });
   assert.equal((await invoke(options)).status, "infrastructure_failed");
   writeJson(result, { ...raw, screenshots: ["../../outside.png"] });
@@ -878,4 +1036,43 @@ test("bounded history compares startup and recipe independently and reports envi
     compare([current], retained)[0]!,
     /unsupported history schema 2/,
   );
+});
+
+test("recipe history detects fixture-only changes and does not equate unknown input digests", () => {
+  const before = record();
+  before.phases.screenshots.metadata = {
+    app: null,
+    runtimes: null,
+    recipe: {
+      content_hash: "md5:unchanged-yaml",
+      input_digest: `v1:sha256:${"a".repeat(64)}`,
+    },
+    runner_image: { version: "v0.5.0", image: "example", digest: null },
+  };
+  const current = structuredClone(before);
+  const recipe = current.phases.screenshots.metadata!.recipe!;
+  const previous = [
+    {
+      schema_version: 1 as const,
+      run_id: "1",
+      run_attempt: "1",
+      rows: [before],
+    },
+  ];
+  recipe.input_digest = `v1:sha256:${"b".repeat(64)}`;
+  assert.ok(
+    compare([current], previous).some((line) =>
+      line.includes("recipe inputs changed"),
+    ),
+  );
+  for (const digest of [undefined, null, `v2:sha256:${"a".repeat(64)}`]) {
+    recipe.input_digest = digest;
+    const changes = compare([current], previous);
+    assert.ok(
+      changes.some((line) =>
+        line.includes("recipe input comparison unavailable"),
+      ),
+    );
+    assert.ok(!changes.some((line) => line.includes("recipe inputs changed")));
+  }
 });

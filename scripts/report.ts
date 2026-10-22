@@ -87,6 +87,9 @@ export function render(rows: ReportRow[]): string {
         `- ${phase} runtimes: ${cell(metadata?.runtimes?.length ? metadata.runtimes.map((runtime) => `${runtime.ref} (commit ${runtime.commit ?? "unavailable"})`).join(", ") : "unavailable")}`,
         `- ${phase} runner image: ${cell(imageVersion ?? "unavailable")} (${cell(image ?? "unavailable")}; digest ${cell(imageDigest ?? "unavailable")})`,
         `- ${phase} recipe content hash: ${cell(metadata?.recipe?.content_hash ?? "unavailable")}`,
+        `- ${phase} recipe input digest: ${cell(metadata?.recipe?.input_digest ?? "unknown")}`,
+        `- ${phase} failure category: ${cell(row.phases[phase].category ?? "unclassified")}`,
+        `- ${phase} wrapper execution: ${cell(row.phases[phase].execution ? JSON.stringify(row.phases[phase].execution) : "unavailable")}`,
       );
       if (row.phases[phase].message)
         lines.push(`- ${phase}: ${cell(row.phases[phase].message)}`);
@@ -208,6 +211,23 @@ export function compare(current: ReportRow[], previous: Snapshot[]): string[] {
         changes.push(`- ${app} startup environment/version changed`);
       if (recipeVersions(before) !== recipeVersions(row))
         changes.push(`- ${app} recipe environment/version changed`);
+      if (row.app.recipe) {
+        const oldDigest =
+          before.phases.screenshots.metadata?.recipe?.input_digest;
+        const newDigest = row.phases.screenshots.metadata?.recipe?.input_digest;
+        if (
+          !oldDigest ||
+          !newDigest ||
+          oldDigest.split(":")[0] !== newDigest.split(":")[0]
+        )
+          changes.push(
+            `- ${app} recipe input comparison unavailable (missing or incompatible fixture-inclusive digest)`,
+          );
+        else if (oldDigest !== newDigest)
+          changes.push(
+            `- ${app} recipe inputs changed (YAML or seeded fixtures)`,
+          );
+      }
     }
   }
   return changes;

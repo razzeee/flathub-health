@@ -69,7 +69,7 @@ Use Linux x86_64 with these tools:
 - Node.js 24.2 or newer. Use the current Node 24 LTS release.
 - pnpm 12.6.0, pinned in `package.json`.
 - Python 3.10 or newer for the upstream action wrapper.
-- Git, Flatpak, GNU `timeout`, and Docker with privileged-container access.
+- Git, Flatpak, OSTree, and Docker with privileged-container access.
 
 Node runs the runner and reporter TypeScript files without a build step. Zod
 validates JSON at runtime and supplies the TypeScript types. The results frontend
@@ -125,15 +125,19 @@ The script installs the selected Flathub ref in a separate `FLATPAK_USER_DIR`
 under `.health-work/` and exports a bundle with `flatpak build-bundle`. The
 upstream action installs that bundle in a fresh container for each phase.
 Startup tests and screenshot recipes run as `nobody` with separate clean
-profiles. Each container downloads its runtime.
+profiles. A frozen dependency repository exported from the host installation
+supplies both phases; missing backend-specific extensions may still be downloaded.
+The available dependency set is recorded in `dependency-inputs.json`, while
+per-phase metadata records the dependencies actually selected.
 
-`runner.json` pins the runner source revision and image release tags. The script
-pulls each image once per job, records its immutable digest, and runs that digest.
+`runner.json` pins the runner source revision, image release tags and published
+image digests. The script pulls each image by digest and checks its identity.
 The workflow reads its upstream checkout revision from the same validated config.
 Each digest is saved before invoking the upstream action.
 Reports include app and runtime refs and commits reported by each test phase,
 the runner image version, reference and immutable digest used by that phase,
-the recipe content hash, runner environment, and UTC test time. Missing phase
+the YAML-only recipe hash, fixture-inclusive input digest, wrapper execution and
+cleanup diagnostics, failure category, runner environment, and UTC test time. Missing phase
 metadata is represented as unavailable rather than inferred from preparation.
 The preparation installation's commits remain in `resolved` for comparison;
 they are not substituted for commits reported by the test containers.
@@ -143,13 +147,13 @@ they are not substituted for commits reported by the test containers.
 Open [Actions](https://github.com/razzeee/flathub-health/actions), select
 "Flathub health", and choose "Run workflow" to start a manual run. The workflow
 also runs daily at 05:17 UTC; GitHub can delay scheduled jobs. The configured
-v0.4.2 images have verified public linux/amd64 manifests and include blank-capture
-publication guards. Hosted validation of this pin is pending. GIMP passed hosted startup and editor-recipe
+v0.5.0 images have verified public linux/amd64 manifests and include blank-capture
+publication guards. See [upgrade validation](docs/flatpak-smoke-v0.5.0.md) for current evidence. GIMP passed hosted startup and editor-recipe
 checks with v0.4.1 in [run 39752711587](https://github.com/razzeee/flathub-health/actions/runs/39752711587);
 the earlier Firefox and GIMP startup-only evidence used v0.4.0. Limitations
 and measured run costs are documented in the selection notes.
 For future upgrades, update the source revision and both image
-tags together in `runner.json` to a verified release with available images.
+tags and digests together in `runner.json` to a verified release with available images.
 
 To pause daily runs, disable "Flathub health" from its Actions page (this also
 disables manual runs). To keep manual runs available but stop the schedule,
@@ -168,14 +172,15 @@ Docker-container cleanup; that remains covered by the safe process tests.
 
 ### Limits
 
-- Each app gets a fresh Ubuntu 24.04 VM. At most two app jobs run at once.
+- Each app gets a fresh Ubuntu 24.04 VM. At most five app jobs run at once.
 - Matrix fail-fast is off. A startup failure does not prevent the recipe attempt.
   Each phase prepares its own image after shared bundle preparation. A missing
   image in either phase cannot suppress the other phase's results.
 - Installation has a 15-minute timeout. Each image pull and bundle export has
   a 5-minute timeout. Other preparation commands have their own timeouts.
-- Each runner phase has a 5-minute internal timeout and a 7-minute outer timeout,
-  followed by a cleanup period. Each app job has a 45-minute limit.
+- Each runner phase has a 5-minute CLI timeout, a 420-second wrapper execution
+  budget and a separate 30-second cleanup budget, within a 480-second process
+  deadline. Each app job has a 45-minute limit.
 - Seven app jobs can use at most 315 VM-minutes per run, plus the catalog and
   report jobs. A daily run would use at most about 9,450 app VM-minutes in a
   30-day month. These are timeout ceilings, not measured costs or an agreed
@@ -202,6 +207,10 @@ reviewed code. Do not use shared machines that hold secrets.
 Reports distinguish startup failures, `recipe_failed`, `infrastructure_failed`,
 and `incomplete`. Preparation and download errors count as infrastructure
 failures. A changed OCR label can break a recipe without breaking the app.
+Capture categories distinguish known infrastructure from unmet expectations.
+Unclassified `screenshot_failed` results remain conservatively infrastructure/unassessed;
+they are not proof of a recipe or app regression. Wrapper diagnostics are separate
+from CLI failures, and unsuccessful cleanup prevents a passing health verdict.
 A startup pass does not test every app function. Review screenshots as evidence;
 the tests do not compare pixels against a reference image.
 
@@ -268,3 +277,7 @@ selection in [the catalog notes](docs/catalog-selection.md). Keep the catalog
 small until hosted tests establish its runtime and download costs.
 
 The workflow does not publish listing screenshots or file upstream issues.
+
+## Runner integration
+
+See [v0.5.0 feature coverage and validation](docs/flatpak-smoke-v0.5.0.md) for dependency snapshots, execution diagnostics, failure attribution, and recipe-input provenance.
