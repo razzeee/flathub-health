@@ -2,18 +2,27 @@
 
 ## Current runner pin
 
-`runner.json` pins flatpak-smoke `v0.4.1` at
-`fb9c87a451ac97438532aa205dec60fdc6bc5384`. On 2026-10-21, both public
-Linux amd64 immutable image digests are recorded in the release notes:
+`runner.json` pins flatpak-smoke `v0.4.2` at
+`779736cabe5288531465ceeec5d6ed5e1c3921d6`. On 2026-10-22, the annotated
+release tag was resolved to this commit and both public image indexes were
+inspected with `docker buildx imagetools inspect`. Each includes linux/amd64;
+the index digests match the release notes:
 
-- Verifier: `sha256:8fc25f80df8e1e3a5d133f6546c7db98a2dac6f2e13fbc295272be510dfe2dca`
-- Screenshots: `sha256:c971baec925c1f8a20c63df0adb462a98fa2b4b08df61cfd9a06d8562597e41c`
+- Verifier: `sha256:23b8fb51359b46e6155ab678c1ac264e789810dbbe45a95370b85954030013f1`
+- Screenshots: `sha256:68aba16f1d8ecb909e3eab0ccc3c4b31b10ad46396143a63564f5d8941a09b18`
 
-Hosted app validation of v0.4.1 is pending. The upstream release notes report
-that VLC actual-media screenshot completion remains unverified because of
-window-selection/focus failures; this pin does not alter downstream recipes.
-The workflow now runs daily at 05:17 UTC, as enabled on main, and can also be
-started manually. The rebase preserves this schedule and the v0.4.1 pin.
+The [v0.4.2 release](https://github.com/razzeee/flatpak-smoke/releases/tag/v0.4.2)
+adds blank/pointer-only smoke capture publication checks and recipe publication
+coverage while preserving diagnostic candidates and sparse real controls.
+Hosted app validation of this pin is pending. Daily runs remain at 05:17 UTC,
+with manual dispatch also available.
+
+The preceding v0.4.1 [main run 39756523147](https://github.com/razzeee/flathub-health/actions/runs/39756523147)
+passed six app jobs, including GIMP's editor recipe. VLC failed, and report
+generation separately crashed with `Cannot read properties of undefined
+(reading 'find')`, leaving summary/history output absent. Pages publishing
+succeeded with the current app results. These are pre-upgrade observations,
+not validation of v0.4.2.
 
 The v0.4.0 [main run 39583067820](https://github.com/razzeee/flathub-health/actions/runs/39583067820)
 passed startup for all five original apps and recipes for four. VLC's screenshot
@@ -35,8 +44,8 @@ If Docker is unavailable, the cancellation fixture fails rather than silently
 passing. Neither case enters `apps.json` or `artifacts/`.
 
 On 2026-10-21, Firefox and GIMP were added directly at the user's request as
-startup-only catalog entries, bringing the matrix to seven apps. Neither has a
-screenshot recipe. [Hosted run 39585913867](https://github.com/razzeee/flathub-health/actions/runs/39585913867)
+startup-only catalog entries, bringing the matrix to seven apps. Neither had a
+screenshot recipe in [hosted run 39585913867](https://github.com/razzeee/flathub-health/actions/runs/39585913867), which
 passed preparation and startup for both and recorded resource measurements.
 Firefox's capture shows a first-run welcome dialog; GIMP's shows a splash screen,
 not editor readiness. The aggregate report preserves all seven app results and
@@ -48,11 +57,9 @@ The previous pin, v0.2.0 at `65fc5d65e02bbf18812d3b9e56ddaa172242e415`, had a
 successful hosted run on all five apps:
 [39441598891](https://github.com/razzeee/flathub-health/actions/runs/39441598891).
 
-Last checked on 2026-10-21. The release tag, source revision, and published
-image manifests were verified; local image configuration-label inspection was
-unavailable because Docker socket access was denied. Hosted app validation has
-not yet run for v0.4.1. The v0.4.0 hosted results above are historical evidence,
-not validation of the newer pin or a claim of repeated stability.
+Last checked on 2026-10-22. The release tag, source revision, and published
+image manifests were verified. The earlier hosted results above are historical
+evidence, not validation of the newer pin or a claim of repeated stability.
 
 ## Passing checks
 

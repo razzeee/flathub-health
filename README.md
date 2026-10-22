@@ -143,7 +143,8 @@ they are not substituted for commits reported by the test containers.
 Open [Actions](https://github.com/razzeee/flathub-health/actions), select
 "Flathub health", and choose "Run workflow" to start a manual run. The workflow
 also runs daily at 05:17 UTC; GitHub can delay scheduled jobs. The configured
-v0.4.1 images have public manifests. GIMP passed hosted startup and editor-recipe
+v0.4.2 images have verified public linux/amd64 manifests and include blank-capture
+publication guards. Hosted validation of this pin is pending. GIMP passed hosted startup and editor-recipe
 checks with v0.4.1 in [run 39752711587](https://github.com/razzeee/flathub-health/actions/runs/39752711587);
 the earlier Firefox and GIMP startup-only evidence used v0.4.0. Limitations
 and measured run costs are documented in the selection notes.
