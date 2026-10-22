@@ -313,22 +313,30 @@ export async function runApp(
       300_000,
     );
     await cmd(["flatpak", "build-update-repo", repo], 300_000);
-    const dependencyRepo = join(work, "dependencies");
-    await cmd(
-      [
-        "python3",
-        join(runner, "action/prepare-dependencies.py"),
-        "--installation",
-        join(work, "installation"),
-        "--output",
-        dependencyRepo,
-      ],
-      300_000,
-    );
-    copyFileSync(
-      join(dependencyRepo, "inputs.json"),
-      join(output, "dependency-inputs.json"),
-    );
+    // v0.5.0 reuse breaks nested processes in these apps with identical commits.
+    // Remove this exception after https://github.com/razzeee/flatpak-smoke/issues/43.
+    const dependencyRepo = ["org.gimp.GIMP", "com.vscodium.codium"].includes(
+      app.app_id,
+    )
+      ? undefined
+      : join(work, "dependencies");
+    if (dependencyRepo) {
+      await cmd(
+        [
+          "python3",
+          join(runner, "action/prepare-dependencies.py"),
+          "--installation",
+          join(work, "installation"),
+          "--output",
+          dependencyRepo,
+        ],
+        300_000,
+      );
+      copyFileSync(
+        join(dependencyRepo, "inputs.json"),
+        join(output, "dependency-inputs.json"),
+      );
+    }
     // Flatpak creates this parent as 0700; the container runs as nobody.
     chmodSync(join(work, "installation"), 0o711);
     record.phases.prepare = { status: "passed" };
