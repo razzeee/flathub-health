@@ -140,7 +140,7 @@ export function snapshots(directory: string): Snapshot[] {
         if (snapshot.schema_version !== 1) {
           return [{ ...snapshot, rows: [], unsupported: true }];
         }
-        return [snapshot];
+        return [{ ...snapshot, rows: snapshot.missing ? [] : snapshot.rows }];
       } catch {
         return [];
       }

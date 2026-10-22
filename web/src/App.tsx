@@ -5,7 +5,7 @@ import { QuestionIcon } from "@phosphor-icons/react/dist/ssr/Question";
 import { WarningIcon } from "@phosphor-icons/react/dist/ssr/Warning";
 import { XIcon } from "@phosphor-icons/react/dist/ssr/X";
 import { MinusIcon } from "@phosphor-icons/react/dist/ssr/Minus";
-import type { ReportRow, Status } from "../../scripts/model.ts";
+import type { Outcome, ReportRow } from "../../scripts/model.ts";
 import type { Capture, PageData } from "./data.ts";
 import { dateLabel } from "./data.ts";
 import { Badge } from "./components/ui/badge.tsx";
@@ -19,6 +19,7 @@ import {
 import { Freshness } from "./components/Freshness.tsx";
 import { Evidence } from "./components/Evidence.tsx";
 import { PhaseDetails } from "./components/PhaseDetails.tsx";
+import { PhaseObservation } from "./components/PhaseObservation.tsx";
 
 const outcomes = {
   passed: { label: "Passed", icon: CheckIcon, variant: "success" },
@@ -41,12 +42,16 @@ const outcomes = {
   },
 } as const;
 
-function OutcomeBadge({ status }: { status: Status }) {
-  const { label, icon: Icon, variant } = outcomes[status];
+function OutcomeBadge({ outcome }: { outcome: Outcome }) {
+  const { label, icon: Icon, variant } = outcomes[outcome.status];
   return (
     <Badge variant={variant}>
       <Icon data-icon="inline-start" aria-hidden="true" />
-      {label}
+      {outcome.status === "infrastructure_failed" &&
+      outcome.reason === "screenshot_failed" &&
+      outcome.category !== "infrastructure"
+        ? "Unclassified failure"
+        : label}
     </Badge>
   );
 }
@@ -66,10 +71,6 @@ function AppResult({
 }) {
   const id = row.app.app_id;
   const tested = "tested_at" in row ? row.tested_at : undefined;
-  const details =
-    "tested_at" in row
-      ? { resolved: row.resolved, runner: row.runner, phases: row.phases }
-      : { error: row.error, phases: row.phases };
   return (
     <article id={`app-${id}`} aria-labelledby={`title-${id}`} tabIndex={-1}>
       <div className="apphead">
@@ -102,7 +103,10 @@ function AppResult({
           <div key={key}>
             <dt>{label}</dt>
             <dd>
-              <OutcomeBadge status={row.phases[key].status} />
+              <OutcomeBadge outcome={row.phases[key]} />
+              {key !== "prepare" || row.phases[key].status !== "passed" ? (
+                <PhaseObservation outcome={row.phases[key]} />
+              ) : null}
             </dd>
           </div>
         ))}
@@ -117,7 +121,7 @@ function AppResult({
         <strong>Test scope</strong> {row.app.limitations}
       </p>
       <div className="card-footer">
-        <PhaseDetails details={details} enhanced={enhanced} />
+        <PhaseDetails row={row} enhanced={enhanced} />
         <a className="diagnostics" href={runUrl}>
           Run diagnostics <span aria-hidden="true">↗</span>
         </a>
@@ -275,9 +279,10 @@ export function App({ data }: { data: PageData }) {
           <h2 id="limits-title">A smoke test, not a guarantee.</h2>
           <div>
             <p>
-              A startup pass checks that an app opens. It does not verify every
-              feature. A recipe failure can mean its steps no longer match the
-              app.
+              A startup pass observes visible content, which can be a splash
+              screen or welcome dialog. A recipe pass checks its stated steps,
+              not every app feature. Failures describe observations, not proof
+              that the app itself is broken.
             </p>
             <p>
               Screenshots are test evidence, not app-store images. At most three

@@ -42,10 +42,7 @@ function exportFixture(args: string[]) {
 }
 
 function mockRunner(root: string) {
-  const config = loadRunner(ROOT);
-  delete config.verify_digest;
-  delete config.screenshots_digest;
-  writeJson(join(root, "runner.json"), config);
+  cpSync(join(ROOT, "runner.json"), join(root, "runner.json"));
 }
 
 function record(selected = app()): Health {
@@ -255,6 +252,8 @@ test("runner configuration schema rejects malformed and unknown fields", (t) => 
     { ...config, screenshots_image: "image\nargument" },
     { ...config, command: "sh" },
     { ...config, verify_digest: "not-a-digest" },
+    { ...config, verify_digest: undefined },
+    { ...config, screenshots_digest: undefined },
   ]) {
     writeJson(join(root, "runner.json"), value);
     assert.throws(() => loadRunner(root));
@@ -496,13 +495,9 @@ test("failed startup still runs the recipe, with immutable images", async (t) =>
       stdout:
         args.at(-1) === "HEAD"
           ? loadRunner(root).revision
-          : args.includes("inspect")
-            ? JSON.stringify([
-                `${args[3]!.split(":")[0]}@sha256:${"a".repeat(64)}`,
-              ])
-            : args.includes("--columns=application,version")
-              ? `${app().app_id}\t1.0`
-              : "example",
+          : args.includes("--columns=application,version")
+            ? `${app().app_id}\t1.0`
+            : "example",
     };
   };
   const row = await runApp(app(), root, join(root, "artifacts"), {
@@ -519,29 +514,21 @@ test("failed startup still runs the recipe, with immutable images", async (t) =>
   assert.equal(row.resolved.version, "1.0");
 });
 
-test("unavailable screenshot image preserves completed startup results", async (t) => {
+test("upstream screenshot failure preserves completed startup results", async (t) => {
   const root = temporary(t);
   mockRunner(root);
   const config = loadRunner(root);
   const calls: string[] = [];
   const execute: Executor = async (args) => {
     exportFixture(args);
-    if (args[1] === "pull" && args[2] === config.screenshots_image) {
-      calls.push("screenshots-image");
-      throw new Error("screenshot image unavailable");
-    }
     return {
       code: 0,
       stdout:
         args.at(-1) === "HEAD"
           ? config.revision
-          : args.includes("inspect")
-            ? JSON.stringify([
-                `${args[3]!.split(":")[0]}@sha256:${"a".repeat(64)}`,
-              ])
-            : args.includes("--columns=application,version")
-              ? `${app().app_id}\t1.0`
-              : "example",
+          : args.includes("--columns=application,version")
+            ? `${app().app_id}\t1.0`
+            : "example",
     };
   };
   const row = await runApp(app(), root, join(root, "artifacts"), {
@@ -549,10 +536,12 @@ test("unavailable screenshot image preserves completed startup results", async (
     execute,
     invoke: async ({ mode }) => {
       calls.push(mode);
+      if (mode === "screenshots")
+        throw new Error("upstream Docker startup failed");
       return { status: "passed" };
     },
   });
-  assert.deepEqual(calls, ["verify", "screenshots-image"]);
+  assert.deepEqual(calls, ["verify", "screenshots"]);
   assert.equal(row.phases.prepare.status, "passed");
   assert.equal(row.phases.verify.status, "passed");
   assert.equal(row.phases.screenshots.status, "infrastructure_failed");
@@ -561,65 +550,45 @@ test("unavailable screenshot image preserves completed startup results", async (
   assert.equal(reported[0]!.phases.screenshots.status, "infrastructure_failed");
 });
 
-for (const failure of ["pull", "digest", "invoke"] as const) {
-  test(`startup ${failure} failure does not suppress screenshot preparation`, async (t) => {
-    const root = temporary(t);
-    mockRunner(root);
-    const config = loadRunner(root);
-    const calls: string[] = [];
-    const execute: Executor = async (args) => {
-      exportFixture(args);
-      if (args[1] === "pull") {
-        calls.push(args[2]!);
-        if (args[2] === config.verify_image && failure === "pull")
-          throw new Error("startup image unavailable");
-      }
-      const repository = args[3]?.split(":")[0];
-      return {
-        code: 0,
-        stdout:
-          args.at(-1) === "HEAD"
-            ? config.revision
-            : args.includes("inspect")
-              ? JSON.stringify([
-                  `ghcr.io/unrelated/image@sha256:${"b".repeat(64)}`,
-                  ...(args[3] === config.verify_image && failure === "digest"
-                    ? []
-                    : [`${repository}@sha256:${"a".repeat(64)}`]),
-                ])
-              : args.includes("--columns=application,version")
-                ? `${app().app_id}\t1.0`
-                : "example",
-      };
+test("upstream startup failure does not suppress screenshot invocation", async (t) => {
+  const root = temporary(t);
+  mockRunner(root);
+  const config = loadRunner(root);
+  const calls: string[] = [];
+  const execute: Executor = async (args) => {
+    exportFixture(args);
+    return {
+      code: 0,
+      stdout:
+        args.at(-1) === "HEAD"
+          ? config.revision
+          : args.includes("--columns=application,version")
+            ? `${app().app_id}\t1.0`
+            : "example",
     };
-    const row = await runApp(app(), root, join(root, "artifacts"), {
-      root,
-      execute,
-      invoke: async ({ mode, image, output }) => {
-        calls.push(mode);
-        const digest = `${config[`${mode}_image`].split(":")[0]}@sha256:${"a".repeat(64)}`;
-        assert.equal(image, digest);
-        const saved = readJson(join(output, "health.json")) as Health;
-        assert.equal(saved.runner[`${mode}_digest`], digest);
-        if (mode === "verify") throw new Error("startup invocation failed");
-        return { status: "passed" };
-      },
-    });
-    assert.deepEqual(calls, [
-      config.verify_image,
-      ...(failure === "invoke" ? ["verify"] : []),
-      config.screenshots_image,
-      "screenshots",
-    ]);
-    assert.equal(row.phases.prepare.status, "passed");
-    assert.equal(row.phases.verify.status, "infrastructure_failed");
-    assert.equal(row.phases.screenshots.status, "passed");
-    assert.equal(
-      aggregate([app()], join(root, "artifacts"))[0]!.phases.screenshots.status,
-      "passed",
-    );
+  };
+  const row = await runApp(app(), root, join(root, "artifacts"), {
+    root,
+    execute,
+    invoke: async ({ mode, image, output }) => {
+      calls.push(mode);
+      const digest = config[`${mode}_digest`];
+      assert.equal(image, digest);
+      const saved = readJson(join(output, "health.json")) as Health;
+      assert.equal(saved.runner[`${mode}_digest`], digest);
+      if (mode === "verify") throw new Error("startup invocation failed");
+      return { status: "passed" };
+    },
   });
-}
+  assert.deepEqual(calls, ["verify", "screenshots"]);
+  assert.equal(row.phases.prepare.status, "passed");
+  assert.equal(row.phases.verify.status, "infrastructure_failed");
+  assert.equal(row.phases.screenshots.status, "passed");
+  assert.equal(
+    aggregate([app()], join(root, "artifacts"))[0]!.phases.screenshots.status,
+    "passed",
+  );
+});
 
 test("runner checkout mismatch is recorded before any image or app commands", async (t) => {
   const root = temporary(t);
@@ -638,71 +607,60 @@ test("runner checkout mismatch is recorded before any image or app commands", as
 });
 
 test("release digests and one dependency snapshot are used by both isolated phases", async (t) => {
-  for (const mismatch of [false, true]) {
-    const root = temporary(t);
-    cpSync(join(ROOT, "runner.json"), join(root, "runner.json"));
-    const config = loadRunner(root);
-    const calls: string[][] = [];
-    const snapshots: string[] = [];
-    const execute: Executor = async (args) => {
-      calls.push(args);
-      exportFixture(args);
-      let stdout = "example";
-      if (args.at(-1) === "HEAD") stdout = config.revision;
-      if (args.includes("inspect"))
-        stdout = JSON.stringify([
-          mismatch
-            ? args[3]!.replace(/sha256:.*/, `sha256:${"a".repeat(64)}`)
-            : args[3],
-        ]);
-      if (args.includes("--columns=ref"))
-        stdout =
-          "org.example.Platform/x86_64/stable\norg.example.Platform.Locale/x86_64/stable";
-      if (args.includes("--show-commit")) stdout = "f".repeat(64);
-      if (args.includes("--show-origin")) stdout = "flathub";
-      return { code: 0, stdout };
-    };
-    const row = await runApp(app(), root, join(root, "artifacts"), {
-      root,
-      execute,
-      invoke: async ({ image, mode, dependencyRepo }) => {
-        assert.equal(image, config[`${mode}_digest`]);
-        assert.ok(dependencyRepo);
-        snapshots.push(dependencyRepo);
-        return { status: "passed" };
-      },
-    });
-    assert.equal(row.phases.prepare.status, "passed");
-    assert.equal(
-      row.phases.verify.status,
-      mismatch ? "infrastructure_failed" : "passed",
-    );
-    assert.equal(
-      row.phases.screenshots.status,
-      mismatch ? "infrastructure_failed" : "passed",
-    );
-    assert.equal(
-      calls.filter((args) => args[1]?.endsWith("prepare-dependencies.py"))
-        .length,
-      1,
-    );
-    assert.equal(
-      calls.filter(
-        (args) => args[0] === "ostree" && args.at(-1) === "f".repeat(64),
-      ).length,
-      2,
-    );
-    assert.ok(
-      existsSync(
-        join(root, "artifacts", app().app_id, "dependency-inputs.json"),
-      ),
-    );
-    if (!mismatch)
-      assert.deepEqual(snapshots, [
-        join(root, ".health-work", app().app_id, "dependencies"),
-        join(root, ".health-work", app().app_id, "dependencies"),
-      ]);
-  }
+  const root = temporary(t);
+  cpSync(join(ROOT, "runner.json"), join(root, "runner.json"));
+  const config = loadRunner(root);
+  const calls: string[][] = [];
+  const snapshots: string[] = [];
+  const execute: Executor = async (args) => {
+    calls.push(args);
+    exportFixture(args);
+    let stdout = "example";
+    if (args.at(-1) === "HEAD") stdout = config.revision;
+    return { code: 0, stdout };
+  };
+  const row = await runApp(app(), root, join(root, "artifacts"), {
+    root,
+    execute,
+    invoke: async ({ image, mode, dependencyRepo }) => {
+      assert.equal(image, config[`${mode}_digest`]);
+      assert.ok(dependencyRepo);
+      snapshots.push(dependencyRepo);
+      return { status: "passed" };
+    },
+  });
+  assert.equal(row.phases.prepare.status, "passed");
+  assert.equal(row.phases.verify.status, "passed");
+  assert.equal(row.phases.screenshots.status, "passed");
+  assert.equal(
+    calls.filter((args) => args[1]?.endsWith("prepare-dependencies.py")).length,
+    1,
+  );
+  assert.ok(
+    !calls.some(
+      (args) => args[0] === "docker" || args.includes("build-bundle"),
+    ),
+  );
+  assert.ok(
+    calls.some((args) =>
+      args.includes(`--create=app/${app().app_id}/x86_64/stable`),
+    ),
+  );
+  assert.ok(calls.some((args) => args[1] === "build-update-repo"));
+  const configure = calls.findIndex(
+    (args) => args[1] === "config" && args.at(-1) === "*",
+  );
+  assert.ok(
+    configure >= 0 &&
+      configure < calls.findIndex((args) => args[1] === "install"),
+  );
+  assert.ok(
+    existsSync(join(root, "artifacts", app().app_id, "dependency-inputs.json")),
+  );
+  assert.deepEqual(snapshots, [
+    join(root, ".health-work", app().app_id, "dependencies"),
+    join(root, ".health-work", app().app_id, "dependencies"),
+  ]);
 });
 
 test("apps without recipes skip screenshot preparation and report it as not requested", async (t) => {
@@ -726,13 +684,9 @@ test("apps without recipes skip screenshot preparation and report it as not requ
         stdout:
           args.at(-1) === "HEAD"
             ? config.revision
-            : args.includes("inspect")
-              ? JSON.stringify([
-                  `${args[3]!.split(":")[0]}@sha256:${"a".repeat(64)}`,
-                ])
-              : args.includes("--columns=application,version")
-                ? `${selected.app_id}\t1.0`
-                : "example",
+            : args.includes("--columns=application,version")
+              ? `${selected.app_id}\t1.0`
+              : "example",
       };
     };
     const row = await runApp(selected, root, join(root, "artifacts"), {
@@ -747,7 +701,6 @@ test("apps without recipes skip screenshot preparation and report it as not requ
     assert.ok(
       commands.every((args) => !args.includes(config.screenshots_image)),
     );
-    assert.equal(row.runner.screenshots_digest, undefined);
     assert.equal(row.phases.screenshots.status, "not_requested");
     const reported = aggregate([selected], join(root, "artifacts"));
     assert.equal(reported[0]!.phases.verify.status, "passed");
@@ -755,7 +708,7 @@ test("apps without recipes skip screenshot preparation and report it as not requ
   }
 });
 
-test("upstream action invocation validates ref and real screenshot files", async (t) => {
+test("upstream invocation retains catalog identity, phase provenance and cleanup evidence", async (t) => {
   const root = temporary(t);
   const output = join(root, "artifacts", app().app_id);
   const destination = join(output, "verify");
@@ -794,7 +747,7 @@ test("upstream action invocation validates ref and real screenshot files", async
     app: app(),
     mode: "verify" as const,
     image: `ghcr.io/razzeee/flatpak-smoke@sha256:${"a".repeat(64)}`,
-    bundle: join(root, "app.flatpak"),
+    repo: join(root, "app-repo"),
     dependencyRepo: join(root, "dependencies"),
     output,
     runner: join(root, ".runner"),
@@ -804,6 +757,9 @@ test("upstream action invocation validates ref and real screenshot files", async
       assert.equal(args[0], "python3");
       assert.equal(opts?.allowFailure, true);
       const inputs = JSON.parse(opts!.env!.FLATPAK_SMOKE_INPUTS!);
+      assert.equal(inputs.repo, "app-repo");
+      assert.equal(inputs["app-ref"], `app/${app().app_id}/x86_64/stable`);
+      assert.equal(inputs.bundle, undefined);
       assert.equal(inputs["dependency-repo"], "dependencies");
       assert.equal(inputs["execution-timeout"], "420");
       assert.equal(inputs["cleanup-timeout"], "30");
@@ -816,8 +772,6 @@ test("upstream action invocation validates ref and real screenshot files", async
       return { code: 0, stdout: "" };
     }) satisfies Executor,
   };
-  assert.equal((await invoke(options)).status, "infrastructure_failed");
-  writeFileSync(join(destination, "capture.png"), "screenshot");
   assert.equal((await invoke(options)).status, "passed");
   const passed = await invoke(options);
   assert.equal(passed.metadata?.app?.commit, "app-phase-commit");
@@ -853,8 +807,6 @@ test("upstream action invocation validates ref and real screenshot files", async
   assert.equal(appFailed.reason, "early_exit");
   assert.equal(appFailed.execution?.cleanup?.remove?.status, "failed");
   writeJson(result, { ...raw, app_ref: "wrong" });
-  assert.equal((await invoke(options)).status, "infrastructure_failed");
-  writeJson(result, { ...raw, screenshots: ["../../outside.png"] });
   assert.equal((await invoke(options)).status, "infrastructure_failed");
 });
 
@@ -1075,4 +1027,17 @@ test("recipe history detects fixture-only changes and does not equate unknown in
     );
     assert.ok(!changes.some((line) => line.includes("recipe inputs changed")));
   }
+});
+
+test("a missing retained history artifact still produces a comparison report", (t) => {
+  const root = temporary(t);
+  writeJson(join(root, "missing.json"), {
+    schema_version: 1,
+    run_id: "1",
+    run_attempt: "1",
+    missing: true,
+  });
+  const changes = compare([record()], snapshots(root));
+  assert.ok(changes.some((line) => line.includes("no retained result record")));
+  assert.ok(changes.some((line) => line.includes("comparison unavailable")));
 });

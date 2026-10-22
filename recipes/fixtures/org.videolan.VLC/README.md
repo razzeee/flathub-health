@@ -17,3 +17,4 @@ The video is copied into the recipe's fresh application data profile before
 VLC starts. It is deliberately short and silent: the screenshot recipe checks
 that VLC opens media and displays video, not audio output, hardware acceleration,
 or broad codec compatibility.
+The recipe repeats this short clip so playback remains active during OCR and capture.

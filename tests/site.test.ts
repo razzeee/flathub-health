@@ -14,6 +14,51 @@ import { prepare, decodeRows } from "../web/scripts/prepare.ts";
 import { freshness, FRESHNESS_MS } from "../web/src/data.ts";
 import { loadRunner } from "../scripts/runner.ts";
 import { ROOT } from "../scripts/io.ts";
+import type { ReportRow } from "../scripts/model.ts";
+
+test("phase explanations preserve unknown causes, wrapper failures and legacy provenance", () => {
+  for (const category of [
+    undefined,
+    "future-category",
+    "infrastructure",
+    "expectation",
+  ]) {
+    const row = record();
+    const rendered = prerender("<!--app-->", {
+      rows: [
+        {
+          ...row,
+          phases: {
+            ...row.phases,
+            screenshots: {
+              status: "infrastructure_failed",
+              reason: "screenshot_failed",
+              category,
+              message: "Capture unavailable",
+              execution: {
+                schema_version: 1,
+                status: "timed_out",
+                exit_code: null,
+                cleanup: { remove: { status: "failed", exit_code: 1 } },
+              },
+            },
+          },
+        } as ReportRow,
+      ],
+      images: {},
+      runUrl: "",
+    });
+    assert.match(rendered, /Capture unavailable/);
+    assert.match(rendered, /timed out/);
+    assert.match(rendered, /remove: failed/);
+    assert.match(rendered, /Unknown — no fixture-inclusive digest/);
+    assert.match(rendered, /splash/);
+    if (!category || category === "future-category")
+      assert.match(rendered, /Unclassified failure/);
+    if (category === "expectation")
+      assert.match(rendered, /cause is not established/);
+  }
+});
 
 const app = {
   app_id: "org.example.Demo",

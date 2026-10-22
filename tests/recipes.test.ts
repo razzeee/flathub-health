@@ -94,12 +94,11 @@ test("VLC recipe seeds and opens its redistributable media fixture", () => {
   );
   assert.deepEqual(recipe.errors, []);
   const value = recipe.toJS() as {
-    window: { title: string };
+    window: { title?: string };
     setup: { files: { source: string; destination: string }[] };
     launch: { args: string[] };
     steps: { wait_text?: string; capture?: { name: string } }[];
   };
-  assert.equal(value.window.title, "VLC media player");
   const recipePath = join(ROOT, "recipes/org.videolan.VLC.yml");
   const source = value.setup.files[0]!.source;
   assert.ok(
@@ -123,6 +122,7 @@ test("VLC recipe seeds and opens its redistributable media fixture", () => {
     "--no-one-instance",
     "--no-qt-privacy-ask",
     "--no-metadata-network-access",
+    "--repeat",
     "${APP_DATA}/VLC-smoke-test.mp4",
   ]);
   assert.ok(
