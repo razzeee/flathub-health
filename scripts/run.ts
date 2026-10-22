@@ -52,7 +52,9 @@ export function classify(
   const knownFailure =
     reason !== undefined &&
     (appReasons.has(reason) ||
-      (mode === "screenshots" && failure?.category === "expectation"));
+      (mode === "screenshots" &&
+        reason === "screenshot_failed" &&
+        failure?.category === "expectation"));
   return {
     status:
       code !== 0 &&
@@ -156,6 +158,7 @@ export const invoke: Invoker = async ({
       digest: image.split("@")[1] ?? null,
     },
   };
+  const outcome: Outcome = { ...classify(result.code, raw, mode), metadata };
   if (parsed.success && parsed.data.status === "passed") {
     const ref = `app/${app.app_id}/${app.arch}/${app.branch}`;
     const captures = parsed.data.screenshots;
@@ -174,15 +177,14 @@ export const invoke: Invoker = async ({
         }
       });
     if (parsed.data.app_ref !== ref || !validCaptures) {
-      return {
+      Object.assign(outcome, {
         status: "infrastructure_failed",
         exit_code: result.code,
         message: "runner passed without expected app ref or screenshot files",
         metadata,
-      };
+      });
     }
   }
-  const outcome: Outcome = { ...classify(result.code, raw, mode), metadata };
   try {
     outcome.execution = executionSchema.parse(
       readJson(`${destination}.execution.json`),

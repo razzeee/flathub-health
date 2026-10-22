@@ -202,9 +202,6 @@ export function compare(current: ReportRow[], previous: Snapshot[]): string[] {
       const recipeVersions = (health: Health) =>
         JSON.stringify({
           contentHash: health.phases.screenshots.metadata?.recipe?.content_hash,
-          inputDigest:
-            health.phases.screenshots.metadata?.recipe?.input_digest ??
-            "unknown",
           appCommit: health.phases.screenshots.metadata?.app?.commit,
           runtimes: health.phases.screenshots.metadata?.runtimes,
           runner: health.phases.screenshots.metadata?.runner_image,
@@ -214,14 +211,23 @@ export function compare(current: ReportRow[], previous: Snapshot[]): string[] {
         changes.push(`- ${app} startup environment/version changed`);
       if (recipeVersions(before) !== recipeVersions(row))
         changes.push(`- ${app} recipe environment/version changed`);
-      if (
-        row.app.recipe &&
-        (!before.phases.screenshots.metadata?.recipe?.input_digest ||
-          !row.phases.screenshots.metadata?.recipe?.input_digest)
-      )
-        changes.push(
-          `- ${app} recipe input comparison unavailable (missing fixture-inclusive digest)`,
-        );
+      if (row.app.recipe) {
+        const oldDigest =
+          before.phases.screenshots.metadata?.recipe?.input_digest;
+        const newDigest = row.phases.screenshots.metadata?.recipe?.input_digest;
+        if (
+          !oldDigest ||
+          !newDigest ||
+          oldDigest.split(":")[0] !== newDigest.split(":")[0]
+        )
+          changes.push(
+            `- ${app} recipe input comparison unavailable (missing or incompatible fixture-inclusive digest)`,
+          );
+        else if (oldDigest !== newDigest)
+          changes.push(
+            `- ${app} recipe inputs changed (YAML or seeded fixtures)`,
+          );
+      }
     }
   }
   return changes;

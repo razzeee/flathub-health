@@ -637,6 +637,74 @@ test("runner checkout mismatch is recorded before any image or app commands", as
   assert.match(row.phases.prepare.message!, /does not match runner.json/);
 });
 
+test("release digests and one dependency snapshot are used by both isolated phases", async (t) => {
+  for (const mismatch of [false, true]) {
+    const root = temporary(t);
+    cpSync(join(ROOT, "runner.json"), join(root, "runner.json"));
+    const config = loadRunner(root);
+    const calls: string[][] = [];
+    const snapshots: string[] = [];
+    const execute: Executor = async (args) => {
+      calls.push(args);
+      exportFixture(args);
+      let stdout = "example";
+      if (args.at(-1) === "HEAD") stdout = config.revision;
+      if (args.includes("inspect"))
+        stdout = JSON.stringify([
+          mismatch
+            ? args[3]!.replace(/sha256:.*/, `sha256:${"a".repeat(64)}`)
+            : args[3],
+        ]);
+      if (args.includes("--columns=ref"))
+        stdout =
+          "org.example.Platform/x86_64/stable\norg.example.Platform.Locale/x86_64/stable";
+      if (args.includes("--show-commit")) stdout = "f".repeat(64);
+      if (args.includes("--show-origin")) stdout = "flathub";
+      return { code: 0, stdout };
+    };
+    const row = await runApp(app(), root, join(root, "artifacts"), {
+      root,
+      execute,
+      invoke: async ({ image, mode, dependencyRepo }) => {
+        assert.equal(image, config[`${mode}_digest`]);
+        assert.ok(dependencyRepo);
+        snapshots.push(dependencyRepo);
+        return { status: "passed" };
+      },
+    });
+    assert.equal(row.phases.prepare.status, "passed");
+    assert.equal(
+      row.phases.verify.status,
+      mismatch ? "infrastructure_failed" : "passed",
+    );
+    assert.equal(
+      row.phases.screenshots.status,
+      mismatch ? "infrastructure_failed" : "passed",
+    );
+    assert.equal(
+      calls.filter((args) => args[1]?.endsWith("prepare-dependencies.py"))
+        .length,
+      1,
+    );
+    assert.equal(
+      calls.filter(
+        (args) => args[0] === "ostree" && args.at(-1) === "f".repeat(64),
+      ).length,
+      2,
+    );
+    assert.ok(
+      existsSync(
+        join(root, "artifacts", app().app_id, "dependency-inputs.json"),
+      ),
+    );
+    if (!mismatch)
+      assert.deepEqual(snapshots, [
+        join(root, ".health-work", app().app_id, "dependencies"),
+        join(root, ".health-work", app().app_id, "dependencies"),
+      ]);
+  }
+});
+
 test("apps without recipes skip screenshot preparation and report it as not requested", async (t) => {
   const { recipe: _recipe, ...startupOnly } = load()[0]!;
   const apps = [startupOnly];
@@ -968,4 +1036,43 @@ test("bounded history compares startup and recipe independently and reports envi
     compare([current], retained)[0]!,
     /unsupported history schema 2/,
   );
+});
+
+test("recipe history detects fixture-only changes and does not equate unknown input digests", () => {
+  const before = record();
+  before.phases.screenshots.metadata = {
+    app: null,
+    runtimes: null,
+    recipe: {
+      content_hash: "md5:unchanged-yaml",
+      input_digest: `v1:sha256:${"a".repeat(64)}`,
+    },
+    runner_image: { version: "v0.5.0", image: "example", digest: null },
+  };
+  const current = structuredClone(before);
+  const recipe = current.phases.screenshots.metadata!.recipe!;
+  const previous = [
+    {
+      schema_version: 1 as const,
+      run_id: "1",
+      run_attempt: "1",
+      rows: [before],
+    },
+  ];
+  recipe.input_digest = `v1:sha256:${"b".repeat(64)}`;
+  assert.ok(
+    compare([current], previous).some((line) =>
+      line.includes("recipe inputs changed"),
+    ),
+  );
+  for (const digest of [undefined, null, `v2:sha256:${"a".repeat(64)}`]) {
+    recipe.input_digest = digest;
+    const changes = compare([current], previous);
+    assert.ok(
+      changes.some((line) =>
+        line.includes("recipe input comparison unavailable"),
+      ),
+    );
+    assert.ok(!changes.some((line) => line.includes("recipe inputs changed")));
+  }
 });
