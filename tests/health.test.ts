@@ -636,7 +636,17 @@ test("release digests and one dependency snapshot are used by both isolated phas
     calls.filter((args) => args[1]?.endsWith("prepare-dependencies.py")).length,
     1,
   );
-  assert.ok(!calls.some((args) => ["docker", "ostree"].includes(args[0]!)));
+  assert.ok(
+    !calls.some(
+      (args) => args[0] === "docker" || args.includes("build-bundle"),
+    ),
+  );
+  assert.ok(
+    calls.some((args) =>
+      args.includes(`--create=app/${app().app_id}/x86_64/stable`),
+    ),
+  );
+  assert.ok(calls.some((args) => args[1] === "build-update-repo"));
   const configure = calls.findIndex(
     (args) => args[1] === "config" && args.at(-1) === "*",
   );
@@ -737,7 +747,7 @@ test("upstream invocation retains catalog identity, phase provenance and cleanup
     app: app(),
     mode: "verify" as const,
     image: `ghcr.io/razzeee/flatpak-smoke@sha256:${"a".repeat(64)}`,
-    bundle: join(root, "app.flatpak"),
+    repo: join(root, "app-repo"),
     dependencyRepo: join(root, "dependencies"),
     output,
     runner: join(root, ".runner"),
@@ -747,6 +757,9 @@ test("upstream invocation retains catalog identity, phase provenance and cleanup
       assert.equal(args[0], "python3");
       assert.equal(opts?.allowFailure, true);
       const inputs = JSON.parse(opts!.env!.FLATPAK_SMOKE_INPUTS!);
+      assert.equal(inputs.repo, "app-repo");
+      assert.equal(inputs["app-ref"], `app/${app().app_id}/x86_64/stable`);
+      assert.equal(inputs.bundle, undefined);
       assert.equal(inputs["dependency-repo"], "dependencies");
       assert.equal(inputs["execution-timeout"], "420");
       assert.equal(inputs["cleanup-timeout"], "30");

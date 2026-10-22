@@ -3,7 +3,7 @@
 Check whether released Flathub apps install and open a window, then capture
 screenshots with app-specific recipes.
 [flatpak-smoke](https://github.com/razzeee/flatpak-smoke) runs the tests and
-desktop automation. This repository selects apps, prepares bundles, and reports
+desktop automation. This repository selects apps, prepares repositories, and reports
 the results. It does not rebuild app manifests.
 
 ## Status
@@ -122,8 +122,9 @@ only that app's generated `artifacts/<app-id>` and `.health-work/<app-id>`
 directories before repeating it. Local outputs do not expire automatically.
 
 The script installs the selected Flathub ref in a separate `FLATPAK_USER_DIR`
-under `.health-work/` and exports a bundle with `flatpak build-bundle`. The
-upstream action installs that bundle in a fresh container for each phase.
+under `.health-work/`, publishes the installed commit as a local app ref, and
+generates its repository summary. Upstream's `repo` + `app-ref` input installs
+that frozen repository in a fresh container for each phase, without bundle export.
 Startup tests and screenshot recipes run as `nobody` with separate clean
 profiles. A frozen dependency repository exported from the host installation
 supplies both phases; missing backend-specific extensions may still be downloaded.
@@ -175,7 +176,7 @@ Docker-container cleanup; that remains covered by the safe process tests.
 
 - Each app gets a fresh Ubuntu 24.04 VM. At most five app jobs run at once.
 - Matrix fail-fast is off. A startup failure does not prevent the recipe attempt.
-  Each phase prepares its own image after shared bundle preparation. A missing
+  Each phase prepares its own image after shared repository preparation. A missing
   image in either phase cannot suppress the other phase's results.
 - Installation has a 15-minute timeout. Bundle and dependency export each have
   a 5-minute timeout. Image pulling belongs to the upstream execution budget.

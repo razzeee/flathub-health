@@ -80,6 +80,11 @@ export function Evidence({
                 <span>{label}</span>
                 <ArrowUpRightIcon aria-hidden="true" />
               </figcaption>
+              <p className="capture-scope">
+                {capture.phase === "verify"
+                  ? "Startup visibility only · may show a splash or welcome screen."
+                  : "Recipe capture · inspect the content against the stated recipe; an image alone is not a readiness guarantee."}
+              </p>
               {description ? (
                 <p className="capture-description">{description}</p>
               ) : null}

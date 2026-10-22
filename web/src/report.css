@@ -298,6 +298,69 @@ code {
 .outcomes dd {
   margin: 0;
 }
+.phase-observation {
+  margin-top: 10px;
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+.phase-observation p {
+  margin: 6px 0;
+}
+.failure-category {
+  color: var(--ink);
+}
+.execution-missing,
+.capture-scope {
+  color: var(--muted);
+}
+.execution-details {
+  margin: 12px 0 0;
+}
+.execution-details dt {
+  margin: 0;
+}
+.execution-details dd {
+  margin: 0 0 6px;
+}
+.capture-scope {
+  font-size: 0.72rem;
+  margin: 6px 0;
+}
+.provenance {
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+.provenance > p {
+  color: var(--muted);
+}
+.provenance section {
+  border-top: 1px solid var(--line);
+  padding-block: 14px;
+}
+.provenance h4 {
+  font-weight: 700;
+}
+.provenance dl {
+  margin: 10px 0;
+}
+.provenance dl > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 12px;
+  margin-block: 7px;
+}
+.provenance dt {
+  color: var(--muted);
+}
+.provenance dd {
+  margin: 0;
+  min-width: 0;
+}
+.provenance ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
 .capture-heading {
   display: flex;
   align-items: baseline;
@@ -592,13 +655,13 @@ footer > span > span {
     padding-block: 14px;
   }
   .outcomes > div {
-    display: flex;
+    display: block;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
   }
   .outcomes dt {
-    margin: 0;
+    margin: 0 0 7px;
   }
   .captures {
     grid-template-columns: 1fr;

@@ -77,7 +77,7 @@ interface Invocation {
   image: string;
   runnerVersion?: string;
   runnerImageName?: string;
-  bundle: string;
+  repo: string;
   dependencyRepo?: string;
   output: string;
   runner: string;
@@ -93,7 +93,7 @@ export const invoke: Invoker = async ({
   image,
   runnerVersion,
   runnerImageName,
-  bundle,
+  repo,
   dependencyRepo,
   output,
   runner,
@@ -104,7 +104,8 @@ export const invoke: Invoker = async ({
   const destination = join(output, mode);
   const inputs = {
     mode,
-    bundle: relative(root, bundle),
+    repo: relative(root, repo),
+    "app-ref": `app/${app.app_id}/${app.arch}/${app.branch}`,
     output: relative(root, destination),
     image,
     user: "nobody",
@@ -299,19 +300,19 @@ export async function runApp(
         .map((line) => line.split("\t"))
         .find(([id]) => id === app.app_id)?.[1] || "unknown";
     record.environment.flatpak = await cmd(["flatpak", "--version"]);
-    const bundle = join(work, "app.flatpak");
+    // Publish the exact installed commit; no further host installation mutations.
+    const repo = join(work, "installation/repo");
     await cmd(
       [
-        "flatpak",
-        "build-bundle",
-        `--arch=${app.arch}`,
-        join(work, "installation/repo"),
-        bundle,
-        app.app_id,
-        app.branch,
+        "ostree",
+        `--repo=${repo}`,
+        "refs",
+        `--create=${ref}`,
+        record.resolved.commit,
       ],
       300_000,
     );
+    await cmd(["flatpak", "build-update-repo", repo], 300_000);
     const dependencyRepo = join(work, "dependencies");
     await cmd(
       [
@@ -339,7 +340,7 @@ export async function runApp(
           image: config[`${mode}_digest`]!,
           runnerVersion: config.version,
           runnerImageName: config[`${mode}_image`],
-          bundle,
+          repo,
           dependencyRepo,
           output,
           runner,
