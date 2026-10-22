@@ -32,3 +32,26 @@ The separate startup verification phase can still pass on the splash. Only a
 successful recipe establishes the empty editor checks above. It does not establish
 image loading, editing, saving, exporting, plug-in functionality, color management,
 or format compatibility. There is no image fixture.
+
+## Hosted validation (2026-10-22)
+
+[Run 39752711587](https://github.com/razzeee/flathub-health/actions/runs/39752711587)
+at health revision `121dbd197b1fbacd193f6ec6eb1edb2c4cb07370` passed GIMP
+preparation, startup, and the editor recipe using flatpak-smoke v0.4.1. The
+reviewed `screenshots/screenshots/000-editor.png` shows the empty editor, menus,
+toolbox, and docks. Initial editor readiness took 14.811 seconds; this is an
+observation, not a configured sleep. The run failed overall in VLC and reporting.
+
+Tested app: GIMP 3.2.6, `app/org.gimp.GIMP/x86_64/stable`, commit
+`a1a84591666ddf43858346427b59241ce2ee286774345d55fd37b80ca1f2c72f`.
+Screenshot image digest:
+`sha256:c971baec925c1f8a20c63df0adb462a98fa2b4b08df61cfd9a06d8562597e41c`.
+
+The preceding [run 39750676614](https://github.com/razzeee/flathub-health/actions/runs/39750676614)
+timed out waiting for initial editor readiness and emitted no recipe capture.
+It seeded `show-welcome-dialog` alone. Adding the matching `config-version`
+removed the forced first-run onboarding and allowed the same editor selector and
+menu checks to pass. A local rootless Podman attempt could not start GNOME because
+`org.freedesktop.login1` activation failed; it supplied no GIMP readiness evidence.
+
+This is one successful hosted editor capture, not a repeatability guarantee.
