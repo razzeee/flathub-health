@@ -1,5 +1,5 @@
 /** Prepare a released app and run the pinned upstream action. */
-import { copyFileSync, mkdirSync, statSync } from "node:fs";
+import { copyFileSync, mkdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import { platform, release } from "node:os";
 import { load } from "./catalog.ts";
@@ -13,7 +13,6 @@ import {
   writeJson,
 } from "./io.ts";
 import {
-  digestSchema,
   executionSchema,
   message,
   successful,
@@ -103,13 +102,6 @@ export const invoke: Invoker = async ({
   execute,
 }) => {
   const destination = join(output, mode);
-  if (
-    ![bundle, destination, ...(dependencyRepo ? [dependencyRepo] : [])].every(
-      (path) => beneath(root, canonical(path)),
-    )
-  ) {
-    throw new Error("bundle and output must stay beneath the workspace");
-  }
   const inputs = {
     mode,
     bundle: relative(root, bundle),
@@ -161,26 +153,12 @@ export const invoke: Invoker = async ({
   const outcome: Outcome = { ...classify(result.code, raw, mode), metadata };
   if (parsed.success && parsed.data.status === "passed") {
     const ref = `app/${app.app_id}/${app.arch}/${app.branch}`;
-    const captures = parsed.data.screenshots;
-    const validCaptures =
-      Array.isArray(captures) &&
-      captures.length > 0 &&
-      captures.every((path: unknown) => {
-        if (typeof path !== "string") return false;
-        try {
-          const file = canonical(join(destination, path));
-          return (
-            beneath(canonical(destination), file) && statSync(file).isFile()
-          );
-        } catch {
-          return false;
-        }
-      });
-    if (parsed.data.app_ref !== ref || !validCaptures) {
+    // App identity is a catalog concern; capture validity belongs to upstream.
+    if (parsed.data.app_ref !== ref) {
       Object.assign(outcome, {
         status: "infrastructure_failed",
         exit_code: result.code,
-        message: "runner passed without expected app ref or screenshot files",
+        message: "runner passed without expected app ref",
         metadata,
       });
     }
@@ -271,42 +249,6 @@ export async function runApp(
     const revision = await cmd(["git", "-C", runner, "rev-parse", "HEAD"]);
     if (revision !== config.revision)
       throw new Error("runner checkout does not match runner.json revision");
-    await cmd(["docker", "info"], 30_000);
-    const resolveImage = async (mode: Mode) => {
-      const image = config[`${mode}_digest`] ?? config[`${mode}_image`];
-      await cmd(["docker", "pull", image], 300_000);
-      const digests: unknown = JSON.parse(
-        await cmd([
-          "docker",
-          "image",
-          "inspect",
-          image,
-          "--format",
-          "{{json .RepoDigests}}",
-        ]),
-      );
-      const repository = image.split("@")[0]!.replace(/:[^/:]+$/, "");
-      const digest = digestSchema.safeParse(
-        Array.isArray(digests)
-          ? digests.find(
-              (value: unknown) =>
-                typeof value === "string" &&
-                value.startsWith(`${repository}@sha256:`),
-            )
-          : undefined,
-      );
-      if (!digest.success) {
-        throw new Error("image has no matching immutable repository digest");
-      }
-      if (
-        config[`${mode}_digest`] &&
-        digest.data !== config[`${mode}_digest`]
-      ) {
-        throw new Error("image digest does not match runner.json pin");
-      }
-      config[`${mode}_digest`] = digest.data;
-      return digest.data;
-    };
     const ref = `app/${app.app_id}/${app.arch}/${app.branch}`;
     await cmd([
       "flatpak",
@@ -316,6 +258,8 @@ export async function runApp(
       "flathub",
       "https://flathub.org/repo/flathub.flatpakrepo",
     ]);
+    // Complete Locale deployments can be exported by the upstream snapshot tool.
+    await cmd(["flatpak", "config", "--user", "--set", "languages", "*"]);
     await cmd(
       ["flatpak", "install", "--user", "--noninteractive", "flathub", ref],
       900_000,
@@ -368,46 +312,6 @@ export async function runApp(
       ],
       300_000,
     );
-    // Export complete deployed commits, including extensions. Locale deployments
-    // can be partial: fetch their full objects at the same checksum before export.
-    const runtimeRefs = (
-      await cmd([
-        "flatpak",
-        "list",
-        "--user",
-        "--runtime",
-        "--all",
-        "--columns=ref",
-      ])
-    )
-      .split("\n")
-      .filter(Boolean);
-    for (const runtimeRef of runtimeRefs) {
-      const commit = await cmd([
-        "flatpak",
-        "info",
-        "--user",
-        "--show-commit",
-        runtimeRef,
-      ]);
-      const origin = await cmd([
-        "flatpak",
-        "info",
-        "--user",
-        "--show-origin",
-        runtimeRef,
-      ]);
-      await cmd(
-        [
-          "ostree",
-          `--repo=${join(work, "installation/repo")}`,
-          "pull",
-          origin,
-          commit,
-        ],
-        300_000,
-      );
-    }
     const dependencyRepo = join(work, "dependencies");
     await cmd(
       [
@@ -429,13 +333,10 @@ export async function runApp(
     for (const mode of ["verify", "screenshots"] as const) {
       if (mode === "screenshots" && !app.recipe) continue;
       try {
-        // Image preparation belongs to its phase, not shared bundle preparation.
-        const image = await resolveImage(mode);
-        save(); // Persist the immutable image before executing upstream code.
         record.phases[mode] = await invokeRunner({
           app,
           mode,
-          image,
+          image: config[`${mode}_digest`]!,
           runnerVersion: config.version,
           runnerImageName: config[`${mode}_image`],
           bundle,

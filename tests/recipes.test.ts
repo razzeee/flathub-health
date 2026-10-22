@@ -123,6 +123,7 @@ test("VLC recipe seeds and opens its redistributable media fixture", () => {
     "--no-one-instance",
     "--no-qt-privacy-ask",
     "--no-metadata-network-access",
+    "--repeat",
     "${APP_DATA}/VLC-smoke-test.mp4",
   ]);
   assert.ok(

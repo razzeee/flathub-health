@@ -4,7 +4,9 @@ import { runnerSchema } from "./model.ts";
 import type { Runner } from "./model.ts";
 
 export function loadRunner(root: string): Runner {
-  return runnerSchema.parse(readJson(join(root, "runner.json")));
+  return runnerSchema
+    .required({ verify_digest: true, screenshots_digest: true })
+    .parse(readJson(join(root, "runner.json")));
 }
 
 // The workflow consumes this validated revision before checking out upstream.

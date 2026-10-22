@@ -8,6 +8,7 @@ launch:
     - --no-one-instance
     - --no-qt-privacy-ask
     - --no-metadata-network-access
+    - --repeat
     - "${APP_DATA}/VLC-smoke-test.mp4"
 window:
   title: VLC media player

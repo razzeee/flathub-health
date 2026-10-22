@@ -131,7 +131,8 @@ The available dependency set is recorded in `dependency-inputs.json`, while
 per-phase metadata records the dependencies actually selected.
 
 `runner.json` pins the runner source revision, image release tags and published
-image digests. The script pulls each image by digest and checks its identity.
+image digests. The upstream wrapper runs Docker with that immutable reference;
+Docker pulls it if needed within the wrapper's execution budget.
 The workflow reads its upstream checkout revision from the same validated config.
 Each digest is saved before invoking the upstream action.
 Reports include app and runtime refs and commits reported by each test phase,
@@ -176,8 +177,8 @@ Docker-container cleanup; that remains covered by the safe process tests.
 - Matrix fail-fast is off. A startup failure does not prevent the recipe attempt.
   Each phase prepares its own image after shared bundle preparation. A missing
   image in either phase cannot suppress the other phase's results.
-- Installation has a 15-minute timeout. Each image pull and bundle export has
-  a 5-minute timeout. Other preparation commands have their own timeouts.
+- Installation has a 15-minute timeout. Bundle and dependency export each have
+  a 5-minute timeout. Image pulling belongs to the upstream execution budget.
 - Each runner phase has a 5-minute CLI timeout, a 420-second wrapper execution
   budget and a separate 30-second cleanup budget, within a 480-second process
   deadline. Each app job has a 45-minute limit.
@@ -217,8 +218,9 @@ the tests do not compare pixels against a reference image.
 ## Development
 
 Zod validates catalog entries, runner configuration, upstream results, and health
-artifacts. The scripts also check path containment, duplicate app IDs, and
-screenshot files.
+artifacts. The scripts also check catalog identity, output path containment and
+duplicate app IDs. Upstream validates invocation paths and capture publication;
+the website independently validates artifact paths before publishing images.
 
 Run `pnpm format` to format maintained files. Prettier skips generated outputs,
 the upstream checkout, dependencies, and the lockfile. CI checks formatting and
