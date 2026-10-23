@@ -131,13 +131,11 @@ supplies both phases; missing backend-specific extensions may still be downloade
 The available dependency set is recorded in `dependency-inputs.json`, while
 per-phase metadata records the dependencies actually selected.
 
-GIMP and VSCodium temporarily use normal network dependency installation instead
-of reusable snapshots because v0.5.0's reuse path breaks their nested processes
-([upstream #43](https://github.com/razzeee/flatpak-smoke/issues/43)). Both checks
-and their readiness assertions still run; actual runtime commits remain recorded.
-The controlled comparison in run `39853806251` passed with identical app/runtime
-commits to the failing reuse run `39851320733`. These two apps do not emit
-`dependency-inputs.json`; dependency reuse remains enabled for the other five.
+The v0.5.1 upgrade restores dependency reuse for GIMP and VSCodium after
+the fix for [upstream #43](https://github.com/razzeee/flatpak-smoke/issues/43).
+Both phases passed hosted validation with matched app/runtime provenance and
+visually reviewed editor captures; see
+[v0.5.1 validation](docs/flatpak-smoke-v0.5.1.md).
 
 `runner.json` pins the runner source revision, image release tags and published
 image digests. The upstream wrapper runs Docker with that immutable reference;
@@ -157,8 +155,8 @@ they are not substituted for commits reported by the test containers.
 Open [Actions](https://github.com/razzeee/flathub-health/actions), select
 "Flathub health", and choose "Run workflow" to start a manual run. The workflow
 also runs daily at 05:17 UTC; GitHub can delay scheduled jobs. The configured
-v0.5.0 images have verified public linux/amd64 manifests and include blank-capture
-publication guards. See [upgrade validation](docs/flatpak-smoke-v0.5.0.md) for current evidence. GIMP passed hosted startup and editor-recipe
+v0.5.1 images include the dependency-reuse subprocess fix and blank-capture
+publication guards. See [upgrade validation](docs/flatpak-smoke-v0.5.1.md) for current evidence. GIMP passed hosted startup and editor-recipe
 checks with v0.4.1 in [run 39752711587](https://github.com/razzeee/flathub-health/actions/runs/39752711587);
 the earlier Firefox and GIMP startup-only evidence used v0.4.0. Limitations
 and measured run costs are documented in the selection notes.
