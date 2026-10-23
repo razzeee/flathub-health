@@ -131,10 +131,10 @@ supplies both phases; missing backend-specific extensions may still be downloade
 The available dependency set is recorded in `dependency-inputs.json`, while
 per-phase metadata records the dependencies actually selected.
 
-The v0.5.1 upgrade candidate restores dependency reuse for GIMP and VSCodium after
+The v0.5.1 upgrade restores dependency reuse for GIMP and VSCodium after
 the fix for [upstream #43](https://github.com/razzeee/flatpak-smoke/issues/43).
-Removal of the temporary exceptions requires hosted validation of both phases,
-matched app/runtime provenance, and visually reviewed editor captures; see
+Both phases passed hosted validation with matched app/runtime provenance and
+visually reviewed editor captures; see
 [v0.5.1 validation](docs/flatpak-smoke-v0.5.1.md).
 
 `runner.json` pins the runner source revision, image release tags and published

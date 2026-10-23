@@ -18,12 +18,22 @@ No retries, timeouts, recipes, readiness assertions or sandbox settings change.
 Local validation passes all 58 tests (including the production site build), type
 checking, formatting and diff checks. Anonymous registry inspection confirms both
 linux/amd64 manifest digests and the matching release revision/version labels.
-Hosted candidate validation is pending. Do not merge exception
-removal based only on the upstream fixture regression. Require all seven hosted
-checks and the report to pass; compare GIMP/VSCodium app/runtime/extension commits
-against the v0.5.0 failure and mitigated baseline. Inspect the declared editor
-captures for GIMP icons/brush previews and the VSCodium README/settings views.
-Record any input drift explicitly rather than calling it a matched comparison.
+Hosted run [39875487593](https://github.com/razzeee/flathub-health/actions/runs/39875487593)
+at `cdd4a00edd0bbf06b2eefb5c163e91f859ea175a` passed all seven app jobs and
+the aggregate report with dependency reuse enabled, without diagnostic workflow
+patches. Both GIMP and VSCodium emit `dependency-inputs.json` again. Their app and
+every selected runtime/extension commit match the failing v0.5.0 reuse run and
+the mitigated baseline exactly in both verify and screenshots phases.
+
+Visually reviewed the declared GIMP editor capture: tool icons and brush previews
+render normally. VSCodium's README editor and settings panel render correctly.
+VLC's declared capture also shows the actual test-pattern video. No splash,
+blank desktop or idle player is accepted as editor/media readiness. Firefox
+remains startup-only; this release makes no page-readiness claim.
+
+This application-level evidence meets the exception-removal gate independently
+of upstream fixture regression coverage. The follow-up commit only records this
+evidence and updates README wording; executable code and runner pins are unchanged.
 
 Baselines: failing reuse run [39851320733](https://github.com/razzeee/flathub-health/actions/runs/39851320733),
 controlled no-reuse run [39853806251](https://github.com/razzeee/flathub-health/actions/runs/39853806251),
