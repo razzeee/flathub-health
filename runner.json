@@ -1,8 +1,8 @@
 {
-  "version": "v0.5.0",
-  "revision": "66bbd6723e1f3d5a032441c615e491369fa80093",
-  "verify_image": "ghcr.io/razzeee/flatpak-smoke:v0.5.0",
-  "screenshots_image": "ghcr.io/razzeee/flatpak-smoke-screenshots:v0.5.0",
-  "verify_digest": "ghcr.io/razzeee/flatpak-smoke@sha256:3d40bd3cefd93ba8f06ee27fbd3db244ef18a4dcc90b74b9f68f37950c2be532",
-  "screenshots_digest": "ghcr.io/razzeee/flatpak-smoke-screenshots@sha256:9770b4471fe0e20e764b9974cf4dc00e5e65f9bdd83b54a42906f2ee6f4618a5"
+  "version": "v0.5.1",
+  "revision": "c16708f020b7108eabbc6ce649097ceb417eefc9",
+  "verify_image": "ghcr.io/razzeee/flatpak-smoke:v0.5.1",
+  "screenshots_image": "ghcr.io/razzeee/flatpak-smoke-screenshots:v0.5.1",
+  "verify_digest": "ghcr.io/razzeee/flatpak-smoke@sha256:ed326c29bc5daaaf6ed4b7176b7b0333dece2dabb9bae86f40fc5e214d468e7c",
+  "screenshots_digest": "ghcr.io/razzeee/flatpak-smoke-screenshots@sha256:1bd69f005dbf89ca554efd0b2f14fe53275df60b7f5fa7a32197a9b5ca27ab32"
 }

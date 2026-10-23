@@ -680,16 +680,17 @@ test("release digests and one dependency snapshot are used by both isolated phas
   ]);
 });
 
-test("nested-process apps retain both checks without broken dependency reuse", async (t) => {
+test("nested-process apps reuse one dependency snapshot in both checks", async (t) => {
   for (const id of ["org.gimp.GIMP", "com.vscodium.codium"]) {
     const root = temporary(t);
     mockRunner(root);
     const selected = load().find((entry) => entry.app_id === id)!;
     const modes: string[] = [];
+    let exports = 0;
     const row = await runApp(selected, root, join(root, "artifacts"), {
       root,
       execute: async (args) => {
-        assert.ok(!args[1]?.endsWith("prepare-dependencies.py"));
+        if (args[1]?.endsWith("prepare-dependencies.py")) exports++;
         exportFixture(args);
         return {
           code: 0,
@@ -699,13 +700,20 @@ test("nested-process apps retain both checks without broken dependency reuse", a
       },
       invoke: async ({ mode, dependencyRepo, app, repo }) => {
         modes.push(mode);
-        assert.equal(dependencyRepo, undefined);
+        assert.equal(
+          dependencyRepo,
+          join(root, ".health-work", id, "dependencies"),
+        );
         assert.ok(app.recipe);
         assert.ok(existsSync(repo));
         return { status: "passed" };
       },
     });
     assert.equal(row.phases.prepare.status, "passed");
+    assert.equal(exports, 1);
+    assert.ok(
+      existsSync(join(root, "artifacts", id, "dependency-inputs.json")),
+    );
     assert.deepEqual(modes, ["verify", "screenshots"]);
   }
 });
