@@ -84,7 +84,7 @@ function record(selected = app()): Health {
   };
 }
 
-test("seven-app catalog and job matrix", () => {
+test("nine-app catalog and job matrix", () => {
   const apps = load();
   assert.deepEqual(
     apps.map(({ app_id }) => app_id),
@@ -96,6 +96,8 @@ test("seven-app catalog and job matrix", () => {
       "org.libreoffice.LibreOffice",
       "org.mozilla.firefox",
       "org.gimp.GIMP",
+      "org.blender.Blender",
+      "me.kozec.syncthingtk",
     ],
   );
   assert.ok(
@@ -104,6 +106,22 @@ test("seven-app catalog and job matrix", () => {
   assert.deepEqual(matrix(apps), {
     include: apps.map(({ app_id }) => ({ app_id })),
   });
+});
+
+test("graphics and tray additions remain startup-only with explicit runner limits", () => {
+  const apps = load();
+  const blender = apps.find(({ app_id }) => app_id === "org.blender.Blender");
+  const tray = apps.find(({ app_id }) => app_id === "me.kozec.syncthingtk");
+  assert.ok(blender);
+  assert.ok(tray);
+  for (const entry of [blender, tray]) {
+    assert.equal(entry.recipe, undefined);
+    assert.match(entry.limitations, /Tests startup only/);
+    assert.match(entry.limitations, /No screenshot recipe/);
+  }
+  assert.match(blender.limitations, /software-rendering limitations/);
+  assert.match(tray.limitations, /false failure/);
+  assert.match(tray.limitations, /does not validate tray-only operation/);
 });
 
 test("Firefox remains startup-only with explicit capture limitations", () => {
