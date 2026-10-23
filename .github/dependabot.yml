@@ -5,15 +5,16 @@ updates:
     schedule:
       interval: weekly
     groups:
-      npm-dependencies:
-        patterns:
-          - "*"
+      dependencies:
+        dependency-type: production
+      dev-dependencies:
+        dependency-type: development
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
     groups:
-      github-actions:
+      actions:
         patterns:
           - "*"
