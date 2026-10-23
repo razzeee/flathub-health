@@ -10,12 +10,12 @@ export function PhaseObservation({ outcome }: { outcome: Outcome }) {
       {failed ? (
         <p className="failure-category">
           {outcome.category === "infrastructure"
-            ? "Runner identified infrastructure trouble."
+            ? "The runner reported an infrastructure failure."
             : outcome.category === "expectation"
-              ? "Unmet expectation; app or recipe cause is not established."
+              ? "A test expectation failed. The cause is not established."
               : outcome.category
                 ? `Unclassified category: ${outcome.category}`
-                : "Unclassified by runner; this verdict does not establish the cause."}
+                : "The runner did not classify the cause."}
         </p>
       ) : null}
       {outcome.reason ? <code>{outcome.reason}</code> : null}

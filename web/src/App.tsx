@@ -155,7 +155,7 @@ export function App({ data }: { data: PageData }) {
       <header className="masthead">
         <div className="topline">
           <a className="wordmark" href="./">
-            <span aria-hidden="true">✳</span> FLATHUB HEALTH
+            FLATHUB HEALTH
           </a>
           <div className="topline-actions">
             <a href={runUrl}>
@@ -166,25 +166,13 @@ export function App({ data }: { data: PageData }) {
         </div>
         <div className="hero">
           <div>
-            <p className="eyebrow">RELEASED APPS / SMOKE TESTS</p>
             <h1>
-              A window into
-              <br />
-              app <em>health.</em>
+              Release <em>checks.</em>
             </h1>
           </div>
           <div className="hero-note">
-            <span className="edition">THE RELEASE CHECK</span>
-            <p>
-              Do they install?
-              <br />
-              Do they open?
-              <br />
-              <span>Here’s what the tests saw.</span>
-            </p>
             <p className="hero-description">
-              Independent startup and recipe results for a small selection of
-              released Flathub apps.
+              Startup checks and screenshots for released Flathub apps.
             </p>
           </div>
         </div>
@@ -192,11 +180,8 @@ export function App({ data }: { data: PageData }) {
         {rows.length ? (
           <dl className="overview">
             <div>
-              <dt>Apps in this report</dt>
-              <dd>
-                {rows.length}
-                <span>selected apps</span>
-              </dd>
+              <dt>Apps</dt>
+              <dd>{rows.length}</dd>
             </div>
             <div>
               <dt>Startup passed</dt>
@@ -217,13 +202,11 @@ export function App({ data }: { data: PageData }) {
       </header>
       <main id="results" tabIndex={-1}>
         <div className="section-heading">
-          <h2>Latest observations</h2>
-          <span>STARTUP · RECIPES · EVIDENCE</span>
+          <h2>Results</h2>
         </div>
         <div className="report-layout">
           {rows.length ? (
             <nav className="app-index" aria-label="Apps in this report">
-              <p className="eyebrow">IN THIS REPORT</p>
               {rows.map((row, i) => (
                 <a key={row.app.app_id} href={`#app-${row.app.app_id}`}>
                   <span className="index-number">
@@ -235,9 +218,6 @@ export function App({ data }: { data: PageData }) {
                   </span>
                 </a>
               ))}
-              <p className="index-note">
-                Results describe the tested versions, not every installation.
-              </p>
               <a
                 className="source-link"
                 href="https://github.com/razzeee/flathub-health"
@@ -261,10 +241,9 @@ export function App({ data }: { data: PageData }) {
             ) : (
               <Empty>
                 <EmptyHeader>
-                  <EmptyTitle>Waiting for evidence.</EmptyTitle>
+                  <EmptyTitle>No results</EmptyTitle>
                   <EmptyDescription>
-                    No app results are available. Check the workflow for missing
-                    or expired artifacts.
+                    Check the workflow for missing or expired artifacts.
                   </EmptyDescription>
                 </EmptyHeader>
                 <EmptyContent>
@@ -275,28 +254,23 @@ export function App({ data }: { data: PageData }) {
           </div>
         </div>
         <aside className="test-notes" aria-labelledby="limits-title">
-          <p className="eyebrow">READING THESE RESULTS</p>
-          <h2 id="limits-title">A smoke test, not a guarantee.</h2>
+          <h2 id="limits-title">Test limits</h2>
           <div>
             <p>
-              A startup pass observes visible content, which can be a splash
-              screen or welcome dialog. A recipe pass checks its stated steps,
-              not every app feature. Failures describe observations, not proof
-              that the app itself is broken.
+              Startup checks can pass on a splash screen or welcome dialog.
+              Recipes test only their stated steps. Results apply to the tested
+              versions. A failure does not prove the app is broken.
             </p>
             <p>
-              Screenshots are test evidence, not app-store images. At most three
-              captures per app, 2 MiB each and 30 MiB total, are kept in this
-              deployment. Workflow diagnostics expire after 14 days.
+              Screenshots do not prove app readiness. This site keeps up to
+              three captures per app, 2 MiB each and 30 MiB total. Workflow
+              diagnostics expire after 14 days.
             </p>
           </div>
         </aside>
       </main>
       <footer>
-        <span>
-          Flathub health <span aria-hidden="true">/</span> Read-only
-          observations
-        </span>
+        <span>Flathub health</span>
         <a href="https://github.com/razzeee/flathub-health">
           Source &amp; methodology ↗
         </a>

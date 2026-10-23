@@ -29,20 +29,18 @@ export function Evidence({
   if (!images.length)
     return (
       <p className="empty-captures">
-        <span aria-hidden="true">–</span>
         {startupOnly
-          ? "Startup-only check. No screenshot recipe requested."
-          : "No screenshots available for this run."}
+          ? "No screenshot recipe requested."
+          : "No screenshots available."}
       </p>
     );
   const current = images[selected]!;
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <div className="capture-heading">
-        <h4>Captured evidence</h4>
+        <h4>Screenshots</h4>
         <span>
-          {images.length} {images.length === 1 ? "image" : "images"} · select to
-          enlarge
+          {images.length} {images.length === 1 ? "image" : "images"}
         </span>
       </div>
       <div className="captures">
@@ -82,8 +80,8 @@ export function Evidence({
               </figcaption>
               <p className="capture-scope">
                 {capture.phase === "verify"
-                  ? "Startup visibility only · may show a splash or welcome screen."
-                  : "Recipe capture · inspect the content against the stated recipe; an image alone is not a readiness guarantee."}
+                  ? "Startup capture, possibly a splash or welcome screen."
+                  : "Recipe capture. Check against the recipe steps."}
               </p>
               {description ? (
                 <p className="capture-description">{description}</p>
@@ -106,7 +104,7 @@ export function Evidence({
           </DialogTitle>
           <DialogDescription>
             {current.description ??
-              "Smoke-test evidence, not an app-store screenshot."}
+              "Test capture. Check against the recipe steps or startup result."}
           </DialogDescription>
         </DialogHeader>
         <img

@@ -63,21 +63,13 @@ footer {
   font-weight: 700;
   letter-spacing: 0.08em;
 }
-.wordmark span {
-  font-size: 1.3rem;
-  color: var(--green);
-  margin-right: 8px;
-}
 .hero {
   display: grid;
   grid-template-columns: 1.5fr 1fr;
   gap: 3rem;
-  padding: 46px 0 38px;
+  padding: 32px 0;
   align-items: center;
 }
-.eyebrow,
-.edition,
-.section-heading > span,
 .app-number,
 .index-number,
 .tested > span,
@@ -87,14 +79,9 @@ figcaption {
     monospace;
   letter-spacing: 0.1em;
 }
-.eyebrow {
-  color: var(--green);
-  font-weight: bold;
-  margin: 0 0 16px;
-}
 h1 {
   font:
-    clamp(3.4rem, 6.5vw, 5.8rem)/0.98 Georgia,
+    clamp(3rem, 5.5vw, 4.8rem)/1.05 Georgia,
     serif;
   letter-spacing: -0.055em;
   margin: 0;
@@ -109,30 +96,41 @@ h1 em {
   max-width: 360px;
   justify-self: end;
 }
-.edition {
-  color: var(--muted);
-}
-.hero-note > p:not(.hero-description) {
-  font:
-    1.6rem/1.35 Georgia,
-    serif;
-  margin: 14px 0;
-}
-.hero-note > p > span {
-  color: var(--green);
-  font-style: italic;
-}
 .hero-description {
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: 1rem;
   margin: 0;
 }
-[role="status"] {
-  border: 1px solid var(--line);
-  border-left: 3px solid currentColor;
-  padding: 13px 18px;
-  font-size: 0.8rem;
-  line-height: 1.7;
+.freshness {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 16px;
+  row-gap: 4px;
+  padding-block: 8px;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+.freshness-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--focus);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.freshness[data-fresh="true"] .freshness-label {
+  color: var(--green);
+}
+.freshness-label::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.freshness-detail {
+  color: var(--muted);
 }
 .overview {
   display: grid;
@@ -180,9 +178,6 @@ h1 em {
     serif;
   letter-spacing: -0.025em;
 }
-.section-heading > span {
-  color: var(--muted);
-}
 .report-layout {
   display: grid;
   grid-template-columns: 190px minmax(0, 1fr);
@@ -195,9 +190,6 @@ h1 em {
 }
 .results-list:only-child {
   grid-column: 1 / -1;
-}
-.app-index > .eyebrow {
-  margin-bottom: 12px;
 }
 .app-index > a {
   display: flex;
@@ -218,26 +210,18 @@ h1 em {
 .app-index > a:hover {
   border-color: var(--green);
 }
-.index-note {
-  font-size: 0.76rem;
-  color: var(--muted);
-  margin: 22px 0 10px;
-}
 .app-index > a.source-link {
   border: 0;
   font-size: 0.76rem;
   text-decoration: underline;
 }
-article {
-  border: 1px solid var(--line);
-  background: var(--card);
-  margin-bottom: 24px;
-  padding: 26px;
+.results-list article {
+  border-top: 1px solid var(--line);
+  padding-block: 26px 36px;
   scroll-margin-top: 24px;
 }
-article:target {
+.results-list article:target {
   border-color: var(--green);
-  box-shadow: 0 0 0 1px var(--green);
 }
 .apphead {
   display: flex;
@@ -513,9 +497,6 @@ footer {
   font-size: 0.7rem;
   color: var(--muted);
 }
-footer > span > span {
-  margin-inline: 8px;
-}
 .skip {
   position: absolute;
   left: -9999px;
@@ -527,11 +508,6 @@ footer > span > span {
   padding: 12px 18px;
   background: var(--card);
   z-index: 10;
-}
-@media (min-width: 1440px) {
-  .hero {
-    padding-block: 56px 46px;
-  }
 }
 @media (max-width: 1000px) {
   .report-layout {
@@ -549,9 +525,6 @@ footer > span > span {
     display: inline;
     margin-right: 6px;
   }
-  article {
-    padding: 22px;
-  }
 }
 @media (max-width: 760px) {
   header,
@@ -565,17 +538,13 @@ footer > span > span {
     padding-block: 30px;
   }
   h1 {
-    font-size: clamp(3.5rem, 10vw, 5rem);
+    font-size: clamp(2.6rem, 9vw, 4rem);
   }
   .hero-note {
     border: 0;
     padding: 0;
     max-width: 32rem;
     justify-self: start;
-  }
-  .hero-note .edition,
-  .hero-note > p:not(.hero-description) {
-    display: none;
   }
   .hero-description {
     max-width: 32rem;
@@ -597,9 +566,6 @@ footer > span > span {
     margin: 3px 0 0;
     font-size: 0.64rem;
   }
-  .section-heading > span {
-    display: none;
-  }
   .report-layout {
     display: block;
   }
@@ -610,10 +576,6 @@ footer > span > span {
     gap: 6px;
     margin-bottom: 20px;
   }
-  .app-index > .eyebrow {
-    flex-basis: 100%;
-    margin-bottom: 3px;
-  }
   .app-index > a {
     border: 1px solid var(--line);
     padding: 9px 12px;
@@ -623,12 +585,11 @@ footer > span > span {
   }
   .app-index .index-number,
   .index-arrow,
-  .index-note,
   .app-index > a.source-link {
     display: none;
   }
-  article {
-    padding: 20px;
+  .results-list article {
+    padding-block: 22px 30px;
   }
   .test-notes > div {
     grid-template-columns: 1fr;
@@ -642,12 +603,6 @@ footer > span > span {
   }
   .wordmark {
     letter-spacing: 0.02em;
-  }
-  .wordmark span {
-    margin-right: 3px;
-  }
-  article {
-    padding: 16px;
   }
   .outcomes {
     grid-template-columns: 1fr;
