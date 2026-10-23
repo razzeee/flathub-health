@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Alert, AlertDescription, AlertTitle } from "./ui/alert.tsx";
 import { dateLabel, freshness, FRESHNESS_MS } from "../data.ts";
 
 export function Freshness({
@@ -42,26 +41,25 @@ export function Freshness({
         ? "FRESH"
         : "STALE / UNAVAILABLE";
   return (
-    <Alert
+    <div
       id="freshness"
+      className="freshness"
       role="status"
       data-tested-at={testedAt}
-      variant={isFresh ? "success" : "warning"}
+      data-fresh={isFresh}
     >
-      <AlertTitle>{label}</AlertTitle>
-      <AlertDescription>
+      <span className="freshness-label">{label}</span>
+      <span className="freshness-detail">
         {hasRows ? (
           <>
             Latest test: {known ? dateLabel(testedAt) : "time unavailable"}.
-            Results expire after 36 hours.
-            {now === null
-              ? " Enable JavaScript for a live freshness check."
-              : null}
+            Results are stale after 36 hours.
+            {now === null ? " Enable JavaScript to check freshness." : null}
           </>
         ) : (
-          "No valid report is available. No apps are assumed to have passed."
+          "No valid report. No apps are assumed to have passed."
         )}
-      </AlertDescription>
-    </Alert>
+      </span>
+    </div>
   );
 }

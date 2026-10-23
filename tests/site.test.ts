@@ -51,7 +51,7 @@ test("phase explanations preserve unknown causes, wrapper failures and legacy pr
     assert.match(rendered, /Capture unavailable/);
     assert.match(rendered, /timed out/);
     assert.match(rendered, /remove: failed/);
-    assert.match(rendered, /Unknown — no fixture-inclusive digest/);
+    assert.match(rendered, /Unknown, no recipe and fixture digest/);
     assert.match(rendered, /splash/);
     if (!category || category === "future-category")
       assert.match(rendered, /Unclassified failure/);
@@ -85,6 +85,35 @@ function temporary(t: { after(fn: () => void): void }) {
   t.after(() => rmSync(root, { recursive: true, force: true }));
   return root;
 }
+
+test("report copy keeps test limits and useful labels without promotional text", () => {
+  const html = prerender("<!--app-->", {
+    rows: decodeRows([record()]),
+    images: {},
+    runUrl: "https://github.com/razzeee/flathub-health/actions",
+  });
+  assert.match(html, /Release <em>checks\.<\/em>/);
+  assert.match(html, /class="freshness" role="status"/);
+  assert.match(html, /data-fresh="false"/);
+  assert.doesNotMatch(html, /role="alert"/);
+  for (const text of [
+    "Startup",
+    "Recipe",
+    "Preparation",
+    "Test scope",
+    "Test limits",
+    "Results apply to the tested versions",
+    "A failure does not prove the app is broken",
+    "Results are stale after 36 hours",
+    "Workflow diagnostics expire after 14 days",
+  ]) {
+    assert.ok(html.includes(text), `Missing report information: ${text}`);
+  }
+  assert.doesNotMatch(
+    html,
+    /A window into|THE RELEASE CHECK|READING THESE RESULTS/,
+  );
+});
 
 function result(
   root: string,
@@ -164,7 +193,7 @@ test("production build prerenders validated results and no-JS links at a relativ
   assert.match(html, /<details>/);
   assert.match(html, /href="screenshots\/org.example.Demo\/verify\/0.png"/);
   assert.match(html, /Startup · 0/);
-  assert.match(html, /not proof of application readiness/);
+  assert.match(html, /Screenshots do not prove app readiness/);
   assert.match(html, /src="\.\/assets\//);
   assert.equal((html.match(/<img /g) ?? []).length, 3);
   assert.doesNotMatch(html, /<!--app-->/);

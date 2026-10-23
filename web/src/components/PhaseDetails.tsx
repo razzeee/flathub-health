@@ -16,10 +16,7 @@ export function PhaseDetails({
 }) {
   const content = (
     <div className="provenance">
-      <p>
-        Observed inside each test phase. Missing values are unknown; preparation
-        metadata is not substituted.
-      </p>
+      <p>Versions recorded during each phase. Missing values stay unknown.</p>
       {(["verify", "screenshots"] as const).map((phase) => {
         const outcome = row.phases[phase];
         const metadata = outcome.metadata;
@@ -64,8 +61,8 @@ export function PhaseDetails({
                     <dt>Recipe inputs</dt>
                     <dd>
                       {metadata?.recipe?.input_digest
-                        ? "YAML and seeded fixtures fingerprinted"
-                        : "Unknown — no fixture-inclusive digest"}
+                        ? "Recipe and fixtures hashed"
+                        : "Unknown, no recipe and fixture digest"}
                     </dd>
                   </div>
                 ) : null}
