@@ -8,7 +8,7 @@ the results. It does not rebuild app manifests.
 
 ## Status
 
-The catalog has seven apps. Calculator, KCalc, and VSCodium cover GTK, Qt, and
+The catalog has nine apps. Calculator, KCalc, and VSCodium cover GTK, Qt, and
 Electron. Their recipes come from flatpak-smoke's `tests/compatibility/` at the
 revision in `runner.json`. VLC opens a short, silent CC0 test video and
 LibreOffice opens a bundled CC0 Writer document from a clean profile. Firefox
@@ -19,6 +19,11 @@ Its startup check alone can still pass on the splash screen. See the
 limits. Their inclusion was requested
 directly; budget is not a gate for these additions. See
 [the selection notes](docs/catalog-selection.md) for sources and test limits.
+
+Blender and Syncthing GTK add graphics-heavy and tray/background behavior with
+startup checks only and no screenshot recipes. Neither has hosted validation yet.
+Graphics limitations or a healthy background process without a window may cause
+runner failures that do not indicate broken app releases.
 
 The historical successful hosted run
 ([39441598891](https://github.com/razzeee/flathub-health/actions/runs/39441598891))
@@ -94,6 +99,8 @@ node scripts/run.ts --app org.videolan.VLC
 node scripts/run.ts --app org.libreoffice.LibreOffice
 node scripts/run.ts --app org.mozilla.firefox
 node scripts/run.ts --app org.gimp.GIMP
+node scripts/run.ts --app org.blender.Blender
+node scripts/run.ts --app me.kozec.syncthingtk
 node scripts/report.ts
 ```
 
@@ -189,8 +196,8 @@ Docker-container cleanup; that remains covered by the safe process tests.
 - Each runner phase has a 5-minute CLI timeout, a 420-second wrapper execution
   budget and a separate 30-second cleanup budget, within a 480-second process
   deadline. Each app job has a 45-minute limit.
-- Seven app jobs can use at most 315 VM-minutes per run, plus the catalog and
-  report jobs. A daily run would use at most about 9,450 app VM-minutes in a
+- Nine app jobs can use at most 405 VM-minutes per run, plus the catalog and
+  report jobs. A daily run would use at most about 12,150 app VM-minutes in a
   30-day month. These are timeout ceilings, not measured costs or an agreed
   budget. Downloads and screenshot storage add to that cost.
 - GitHub keeps result artifacts and the combined report for 14 days.

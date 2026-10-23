@@ -55,6 +55,20 @@
       "arch": "x86_64",
       "recipe": "recipes/org.gimp.GIMP.yml",
       "limitations": "Startup visibility can pass on the splash screen. The separate recipe selects the empty editor by its English window title and waits for Tools and Filters menus before capture, with the welcome dialog disabled in a fresh profile. Does not test image loading, editing, saving, exporting, plug-in functionality, color management, or format compatibility."
+    },
+    {
+      "app_id": "org.blender.Blender",
+      "name": "Blender",
+      "branch": "stable",
+      "arch": "x86_64",
+      "limitations": "Tests startup only. No screenshot recipe yet. Graphics API requirements or software-rendering limitations in the runner may prevent startup without indicating a packaging defect. It does not test modeling, rendering, GPU acceleration, or performance. First-run dialogs may affect startup results."
+    },
+    {
+      "app_id": "me.kozec.syncthingtk",
+      "name": "Syncthing GTK",
+      "branch": "stable",
+      "arch": "x86_64",
+      "limitations": "Tests startup only. No screenshot recipe yet. This tray-oriented app has a first-run wizard and a background daemon. A missing window or unavailable notification area may cause a false failure; a visible wizard does not validate tray-only operation. It does not test synchronization, peer discovery, autostart, or daemon lifecycle."
     }
   ]
 }

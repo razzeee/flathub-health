@@ -1,5 +1,31 @@
 # Catalog selection research
 
+## Graphics and tray coverage (2026-10-23)
+
+Added two edge-case apps at the user's request, not popularity selections.
+Official Flathub AppStream responses checked on this date confirmed these refs:
+
+- [Blender](https://flathub.org/api/v2/appstream/org.blender.Blender):
+  `app/org.blender.Blender/x86_64/stable`. This adds a graphics-heavy 3D app
+  whose startup can expose graphics API and software-rendering limits in CI.
+- [Syncthing GTK](https://flathub.org/api/v2/appstream/me.kozec.syncthingtk):
+  `app/me.kozec.syncthingtk/x86_64/stable`. Its metadata describes a notification
+  area icon, first-run wizard, and background Syncthing daemon.
+
+Both receive startup checks only, with no screenshot recipes yet. Neither has
+been validated end to end here. A Blender failure may reflect the runner's
+graphics environment rather than a broken release. Syncthing GTK may show a
+wizard on a clean profile; passing that check does not exercise tray-only
+operation or synchronization. Conversely, a healthy background process without
+a window may fail the runner's window-based check. These additions do not change
+that check or automatically reclassify its results; review diagnostics before
+treating an edge-case failure as an app defect.
+
+The catalog now has nine apps. At the unchanged 45-minute per-app timeout, its
+app-job ceiling is 405 VM-minutes per run or 12,150 per 30-day month of daily runs,
+excluding other jobs. These are timeout ceilings, not measured consumption.
+The earlier seven-app and five-app observations below remain historical evidence.
+
 Research checked 2026-10-21 against the official Flathub Popular collection
 and AppStream API. Following the research, the user requested direct
 implementation: Firefox and GIMP were initially startup-only entries in `apps.json`.
