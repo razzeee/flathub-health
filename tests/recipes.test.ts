@@ -121,6 +121,7 @@ test("VLC recipe seeds and opens its redistributable media fixture", () => {
   assert.deepEqual(value.launch.args, [
     "--no-one-instance",
     "--no-qt-privacy-ask",
+    "--no-qt-video-autoresize",
     "--no-metadata-network-access",
     "--repeat",
     "${APP_DATA}/VLC-smoke-test.mp4",
