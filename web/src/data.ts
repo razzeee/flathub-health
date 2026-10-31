@@ -1,4 +1,11 @@
 import type { Mode, ReportRow } from "../../scripts/model.ts";
+import type { SecurityRow } from "../../scripts/security-model.ts";
+
+export interface SecurityView {
+  row: SecurityRow;
+  inventoryUrl?: string;
+  evidenceUnavailable?: boolean;
+}
 
 export interface Capture {
   url: string;
@@ -16,6 +23,7 @@ export interface PageData {
   rows: ReportRow[];
   images: Record<string, Capture[]>;
   runUrl: string;
+  security?: Record<string, SecurityView>;
 }
 
 export const FRESHNESS_MS = 36 * 60 * 60 * 1000;

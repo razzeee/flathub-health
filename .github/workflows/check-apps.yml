@@ -3,6 +3,11 @@ on:
   schedule:
     - cron: "17 5 * * *"
   workflow_dispatch:
+    inputs:
+      inventory:
+        description: Generate experimental manifest inventories for the three pilot apps
+        type: boolean
+        default: false
 
 permissions:
   actions: read
@@ -19,6 +24,9 @@ jobs:
     outputs:
       matrix: ${{ steps.catalog.outputs.matrix }}
       runner_revision: ${{ steps.runner.outputs.revision }}
+      security_matrix: ${{ steps.security.outputs.matrix }}
+      security_revision: ${{ steps.security.outputs.revision }}
+      security_rust: ${{ steps.security.outputs.rust }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -38,6 +46,102 @@ jobs:
         run: |
           revision=$(node scripts/runner.ts)
           echo "revision=$revision" >> "$GITHUB_OUTPUT"
+      - id: security
+        run: |
+          echo "matrix=$(node scripts/security-config.ts --field matrix)" >> "$GITHUB_OUTPUT"
+          echo "revision=$(node scripts/security-config.ts --field revision)" >> "$GITHUB_OUTPUT"
+          echo "rust=$(node scripts/security-config.ts --field rust)" >> "$GITHUB_OUTPUT"
+
+  inventory:
+    if: github.event_name == 'workflow_dispatch' && inputs.inventory
+    needs: catalog
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix: ${{ fromJSON(needs.catalog.outputs.security_matrix) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: razzeee/flatpak-sbom
+          ref: ${{ needs.catalog.outputs.security_revision }}
+          path: .sbom
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --prod --frozen-lockfile
+      - name: Build pinned inventory generator
+        env:
+          RUST_VERSION: ${{ needs.catalog.outputs.security_rust }}
+        run: |
+          sudo apt-get update && sudo apt-get install -y ostree
+          rustup toolchain install "$RUST_VERSION" --profile minimal
+          cargo +"$RUST_VERSION" build --locked --release --manifest-path .sbom/Cargo.toml
+      - name: Observe published manifest inventory
+        env:
+          APP_ID: ${{ matrix.app_id }}
+        run: node scripts/security.ts --app "$APP_ID"
+      - name: Upload inventory record
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: security-record-${{ matrix.app_id }}
+          path: artifacts/security/${{ matrix.app_id }}/security.json
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Upload inventory evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: security-evidence-${{ matrix.app_id }}
+          path: |
+            artifacts/security/${{ matrix.app_id }}/inventory.cdx.json
+            artifacts/security/${{ matrix.app_id }}/generation.log
+          if-no-files-found: warn
+          retention-days: 14
+
+  security-report:
+    if: always() && needs.catalog.result == 'success'
+    needs: [catalog, inventory]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --prod --frozen-lockfile
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: github.event_name == 'workflow_dispatch' && inputs.inventory
+        continue-on-error: true
+        with:
+          pattern: security-record-*
+          path: downloads
+      - name: Aggregate expected inventories
+        env:
+          REQUESTED: ${{ github.event_name == 'workflow_dispatch' && inputs.inventory && 'true' || 'false' }}
+        run: node scripts/security-report.ts --requested "$REQUESTED"
+      - name: Inventory summary
+        if: always()
+        run: cat artifacts/security-report/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: security-report
+          path: artifacts/security-report/
+          if-no-files-found: error
+          retention-days: 14
 
   check:
     needs: catalog
@@ -171,7 +275,7 @@ jobs:
 
   publish-results:
     if: always() && needs.catalog.result == 'success' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
-    needs: [catalog, check, report]
+    needs: [catalog, check, report, security-report]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -204,6 +308,11 @@ jobs:
           path: downloads
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
       - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        continue-on-error: true
+        with:
+          pattern: security-*
+          path: downloads
       - name: Build read-only results page
         # Validate report records, build the client, and prerender static HTML.
         run: pnpm site --report downloads/report/report.json --artifacts downloads --output site

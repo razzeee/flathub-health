@@ -1,6 +1,7 @@
 node_modules/
 artifacts/
 .runner/
+.sbom/
 .health-work/
 pnpm-lock.yaml
 site/
