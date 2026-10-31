@@ -9,6 +9,7 @@ import {
 } from "../../scripts/model.ts";
 import type { ReportRow } from "../../scripts/model.ts";
 import type { Capture, PageData } from "../src/data.ts";
+import { prepareSecurity } from "./security.ts";
 
 const captureMetadataSchema = z.object({
   schema_version: z.literal(1),
@@ -75,6 +76,8 @@ export function prepare(
   } catch {
     /* Missing evidence never establishes a pass. */
   }
+  const prepared = prepareSecurity(rows, artifactsPath, output);
+  rows = prepared.rows;
   const images: Record<string, Capture[]> = {};
   let bytes = 0;
   for (const row of rows) {
@@ -168,6 +171,7 @@ export function prepare(
   return {
     rows,
     images,
+    security: prepared.security,
     runUrl: /^\d+$/.test(runId ?? "")
       ? `https://github.com/razzeee/flathub-health/actions/runs/${runId}`
       : "https://github.com/razzeee/flathub-health/actions",

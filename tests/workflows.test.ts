@@ -98,7 +98,16 @@ test("app jobs run daily or manually and depend on successful catalog validation
   const apps = workflow("check-apps.yml");
   assert.deepEqual(apps.on, {
     schedule: [{ cron: "17 5 * * *" }],
-    workflow_dispatch: null,
+    workflow_dispatch: {
+      inputs: {
+        inventory: {
+          description:
+            "Generate experimental manifest inventories for the three pilot apps",
+          type: "boolean",
+          default: false,
+        },
+      },
+    },
   });
   assert.deepEqual(apps.permissions, { actions: "read", contents: "read" });
   assert.deepEqual(apps.concurrency, {
@@ -124,9 +133,12 @@ test("app jobs run daily or manually and depend on successful catalog validation
       "pnpm test",
       'echo "matrix=$(node scripts/catalog.ts)" >> "$GITHUB_OUTPUT"',
       'revision=$(node scripts/runner.ts)\necho "revision=$revision" >> "$GITHUB_OUTPUT"\n',
+      'echo "matrix=$(node scripts/security-config.ts --field matrix)" >> "$GITHUB_OUTPUT"\necho "revision=$(node scripts/security-config.ts --field revision)" >> "$GITHUB_OUTPUT"\necho "rust=$(node scripts/security-config.ts --field rust)" >> "$GITHUB_OUTPUT"\n',
     ],
   );
-  const catalog = apps.jobs.catalog!.steps.at(-2)!;
+  const catalog = apps.jobs.catalog!.steps.find(
+    (step) => step.id === "catalog",
+  )!;
   assert.equal(catalog.id, "catalog");
   assert.match(catalog.run!, /node scripts\/catalog\.ts/);
   const uploads = apps.jobs.check!.steps.filter((step) =>
@@ -172,6 +184,69 @@ test("resource measurements cannot suppress app checks or diagnostic upload", ()
   assert.equal(steps[upload]!.if, "always()");
 });
 
+test("inventory pilot is opt-in, independently bounded, pinned and failure-reporting", () => {
+  const apps = workflow("check-apps.yml");
+  const inventory = apps.jobs.inventory!;
+  assert.equal(
+    inventory.if,
+    "github.event_name == 'workflow_dispatch' && inputs.inventory",
+  );
+  assert.equal(inventory.needs, "catalog");
+  assert.equal(inventory["timeout-minutes"], 20);
+  assert.deepEqual(inventory.strategy, {
+    "fail-fast": false,
+    "max-parallel": 2,
+    matrix: "${{ fromJSON(needs.catalog.outputs.security_matrix) }}",
+  });
+  const checkout = inventory.steps.find(
+    (step) => step.with?.repository === "razzeee/flatpak-sbom",
+  )!;
+  assert.equal(
+    checkout.with!.ref,
+    "${{ needs.catalog.outputs.security_revision }}",
+  );
+  assert.equal(checkout.with!["persist-credentials"], false);
+  assert.ok(
+    inventory.steps.some((step) =>
+      step.run?.includes('cargo +"$RUST_VERSION" build --locked --release'),
+    ),
+  );
+  for (const upload of inventory.steps.filter((step) =>
+    step.uses?.startsWith("actions/upload-artifact@"),
+  )) {
+    assert.equal(upload.if, "always()");
+    assert.equal(upload.with!["retention-days"], 14);
+  }
+  assert.equal(
+    inventory.steps.filter((step) =>
+      step.uses?.startsWith("actions/upload-artifact@"),
+    ).length,
+    2,
+  );
+  const report = apps.jobs["security-report"]!;
+  assert.deepEqual(report.needs, ["catalog", "inventory"]);
+  assert.equal(report.if, "always() && needs.catalog.result == 'success'");
+  assert.equal(
+    report.steps.find((step) =>
+      step.uses?.startsWith("actions/download-artifact@"),
+    )!["continue-on-error"],
+    true,
+  );
+  assert.equal(
+    report.steps.find((step) =>
+      step.uses?.startsWith("actions/upload-artifact@"),
+    )!.if,
+    "always()",
+  );
+  const publish = apps.jobs["publish-results"]!;
+  assert.ok(publish.steps.some((step) => step.with?.pattern === "security-*"));
+  assert.ok(
+    publish.steps.every(
+      (step) => !/flatpak-sbom|cargo|grype/.test(step.run ?? ""),
+    ),
+  );
+});
+
 test("Pages publishing is isolated to a least-privilege results job", () => {
   const apps = workflow("check-apps.yml");
   const publish = apps.jobs["publish-results"]!;
@@ -179,7 +254,12 @@ test("Pages publishing is isolated to a least-privilege results job", () => {
     publish.if,
     "always() && needs.catalog.result == 'success' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)",
   );
-  assert.deepEqual(publish.needs, ["catalog", "check", "report"]);
+  assert.deepEqual(publish.needs, [
+    "catalog",
+    "check",
+    "report",
+    "security-report",
+  ]);
   assert.deepEqual(publish.permissions, {
     actions: "read",
     contents: "read",

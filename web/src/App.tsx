@@ -6,7 +6,7 @@ import { WarningIcon } from "@phosphor-icons/react/dist/ssr/Warning";
 import { XIcon } from "@phosphor-icons/react/dist/ssr/X";
 import { MinusIcon } from "@phosphor-icons/react/dist/ssr/Minus";
 import type { Outcome, ReportRow } from "../../scripts/model.ts";
-import type { Capture, PageData } from "./data.ts";
+import type { Capture, PageData, SecurityView } from "./data.ts";
 import { dateLabel } from "./data.ts";
 import { Badge } from "./components/ui/badge.tsx";
 import {
@@ -20,6 +20,7 @@ import { Freshness } from "./components/Freshness.tsx";
 import { Evidence } from "./components/Evidence.tsx";
 import { PhaseDetails } from "./components/PhaseDetails.tsx";
 import { PhaseObservation } from "./components/PhaseObservation.tsx";
+import { SecurityObservation } from "./components/SecurityObservation.tsx";
 
 const outcomes = {
   passed: { label: "Passed", icon: CheckIcon, variant: "success" },
@@ -62,12 +63,14 @@ function AppResult({
   runUrl,
   index,
   enhanced,
+  security,
 }: {
   row: ReportRow;
   images: Capture[];
   runUrl: string;
   index: number;
   enhanced: boolean;
+  security?: SecurityView;
 }) {
   const id = row.app.app_id;
   const tested = "tested_at" in row ? row.tested_at : undefined;
@@ -120,6 +123,7 @@ function AppResult({
       <p className="app-limit">
         <strong>Test scope</strong> {row.app.limitations}
       </p>
+      <SecurityObservation health={row} view={security} />
       <div className="card-footer">
         <PhaseDetails row={row} enhanced={enhanced} />
         <a className="diagnostics" href={runUrl}>
@@ -236,6 +240,7 @@ export function App({ data }: { data: PageData }) {
                   runUrl={runUrl}
                   index={index}
                   enhanced={enhanced}
+                  security={data.security?.[row.app.app_id]}
                 />
               ))
             ) : (

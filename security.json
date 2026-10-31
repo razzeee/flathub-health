@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "repository": "https://dl.flathub.org/repo",
+  "generator": {
+    "repository": "razzeee/flatpak-sbom",
+    "revision": "6b10e8aa8d65737c89789434d91bb56aee520992",
+    "version": "0.1.0",
+    "rust": "1.98.1"
+  },
+  "apps": ["org.gnome.Calculator", "org.kde.kcalc", "com.vscodium.codium"]
+}

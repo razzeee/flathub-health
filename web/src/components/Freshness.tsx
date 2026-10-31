@@ -4,9 +4,13 @@ import { dateLabel, freshness, FRESHNESS_MS } from "../data.ts";
 export function Freshness({
   testedAt,
   hasRows,
+  id = "freshness",
+  observation = "Latest test",
 }: {
   testedAt: string;
   hasRows: boolean;
+  id?: string;
+  observation?: string;
 }) {
   // SSR and the first client render agree. Only a live browser clock claims fresh.
   const [now, setNow] = useState<number | null>(null);
@@ -42,7 +46,7 @@ export function Freshness({
         : "STALE / UNAVAILABLE";
   return (
     <div
-      id="freshness"
+      id={id}
       className="freshness"
       role="status"
       data-tested-at={testedAt}
@@ -52,7 +56,7 @@ export function Freshness({
       <span className="freshness-detail">
         {hasRows ? (
           <>
-            Latest test: {known ? dateLabel(testedAt) : "time unavailable"}.
+            {observation}: {known ? dateLabel(testedAt) : "time unavailable"}.
             Results are stale after 36 hours.
             {now === null ? " Enable JavaScript to check freshness." : null}
           </>

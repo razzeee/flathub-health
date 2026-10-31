@@ -294,6 +294,14 @@ small until hosted tests establish its runtime and download costs.
 
 The workflow does not publish listing screenshots or file upstream issues.
 
+## Manifest inventory pilot
+
+Manual workflow runs can opt into manifest-derived CycloneDX inventories for
+Calculator, KCalc and VSCodium. Inventory generation, provenance, freshness and
+downloads are independent of smoke verdicts. Coverage is explicitly incomplete;
+vulnerability scanning is not performed. See [the pilot guide](docs/manifest-inventory.md)
+for setup, execution, storage, validation limits and the planned scan increment.
+
 ## Runner integration
 
 See [v0.5.0 feature coverage and validation](docs/flatpak-smoke-v0.5.0.md) for dependency snapshots, execution diagnostics, failure attribution, and recipe-input provenance.
