@@ -86,8 +86,11 @@ export function prepare(
     images[appId] = captures;
     for (const phase of ["verify", "screenshots"] as const) {
       if (row.phases[phase].status === "not_requested") continue;
+      const attemptPath =
+        row.phases[phase].attempts?.length === 2 ? ["retry"] : [];
       const manifest = evidenceFile(artifactsPath, [
         `health-${appId}`,
+        ...attemptPath,
         phase,
         "result.json",
       ]);
@@ -111,6 +114,7 @@ export function prepare(
       >();
       const sidecar = evidenceFile(artifactsPath, [
         `health-${appId}`,
+        ...attemptPath,
         phase,
         "screenshots.json",
       ]);
@@ -132,6 +136,7 @@ export function prepare(
           continue;
         const source = evidenceFile(artifactsPath, [
           `health-${appId}`,
+          ...attemptPath,
           phase,
           ...capture.split("/"),
         ]);

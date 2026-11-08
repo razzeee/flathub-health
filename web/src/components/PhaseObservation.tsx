@@ -1,12 +1,24 @@
 import type { Outcome } from "../../../scripts/model.ts";
+import { attemptState } from "../../../scripts/attempts.ts";
 
 export function PhaseObservation({ outcome }: { outcome: Outcome }) {
   const failed = !["passed", "not_requested", "incomplete"].includes(
     outcome.status,
   );
   const execution = outcome.execution;
+  const state = attemptState(outcome);
   return (
     <div className="phase-observation">
+      {state === "retry_recovered" || state === "retry_failed" ? (
+        <p>
+          {state === "retry_recovered"
+            ? "Recovered after one retry, not a first-attempt pass."
+            : "Still failing after one retry."}{" "}
+          Both attempts are retained in the raw record and run diagnostics.
+        </p>
+      ) : state === "first_pass" ? (
+        <p>Passed on the first attempt.</p>
+      ) : null}
       {failed ? (
         <p className="failure-category">
           {outcome.category === "infrastructure"
