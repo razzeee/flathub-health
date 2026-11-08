@@ -13,8 +13,22 @@ import {
   validateScan,
 } from "../scripts/security-scan.ts";
 import { sha256 } from "../scripts/security.ts";
+import { verifySecuritySite } from "../scripts/verify-security-site.ts";
 
 const config = loadSecurity();
+test("publication proof cannot succeed with missing page data or missing target records", async () => {
+  await assert.rejects(
+    verifySecuritySite(async () => Buffer.from("<html></html>")),
+    /page data is missing/,
+  );
+  await assert.rejects(
+    verifySecuritySite(async () =>
+      Buffer.from(
+        '<script id="page-data" type="application/json">{"security":{}}</script>',
+      ),
+    ),
+  );
+});
 const properties = (scope: string) => [
   { name: "flatpak:scope", value: scope },
   { name: "flatpak:ref", value: `${scope}/org.example.Demo/x86_64/stable` },

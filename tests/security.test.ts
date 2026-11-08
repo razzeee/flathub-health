@@ -20,7 +20,12 @@ import {
   securityRecordSchema,
 } from "../scripts/security-model.ts";
 import type { SecurityConfig } from "../scripts/security-model.ts";
-import { inspectInventory, observeSecurity } from "../scripts/security.ts";
+import {
+  evidenceBytes,
+  inspectInventory,
+  observeSecurity,
+} from "../scripts/security.ts";
+import { verifySecuritySite } from "../scripts/verify-security-site.ts";
 import type { Executor } from "../scripts/process.ts";
 import type { App, ReportRow } from "../scripts/model.ts";
 import { prepareSecurity } from "../web/scripts/security.ts";
@@ -596,6 +601,39 @@ test(
       assert.match(html, /Download exact scanner input/);
       assert.match(html, /lodash/);
       assert.doesNotMatch(html, /Vulnerability scan: not performed/);
+      const template =
+        '<!--app--><script id="page-data" type="application/json"></script>';
+      const pageData = {
+        rows: [health],
+        images: {},
+        runUrl: "",
+        security: views.security,
+      };
+      const pagePath = join(root, "site/index.html");
+      const pageHtml = prerender(template, pageData);
+      writeFileSync(pagePath, pageHtml);
+      const get = async (parts: string[], limit: number) =>
+        evidenceBytes(join(root, "site"), parts, limit);
+      assert.equal(
+        (await verifySecuritySite(get, { config, apps: [app] })).length,
+        1,
+      );
+      await assert.rejects(
+        verifySecuritySite(get, {
+          config,
+          apps: [app],
+          runId: "99999999999999",
+        }),
+        /identity mismatch/,
+      );
+      const forged = structuredClone(pageData);
+      forged.security[app.app_id]!.scan!.findings = [];
+      writeFileSync(pagePath, prerender(template, forged));
+      await assert.rejects(
+        verifySecuritySite(get, { config, apps: [app] }),
+        /published scan view mismatch/,
+      );
+      writeFileSync(pagePath, pageHtml);
       const path = join(
         root,
         "downloads",

@@ -36,7 +36,9 @@ export function decodeSecurity(
     (record.status === "completed" &&
       config.analysis &&
       (record.content_scanner?.version !== config.analysis.syft.version ||
-        record.scan === "not_requested")) ||
+        record.scan === "not_requested" ||
+        (record.scan.status === "completed" &&
+          record.scan.scanner_version !== config.analysis.grype.version))) ||
     (record.status === "completed" &&
       record.inventory.app.ref !==
         `app/${app.app_id}/${app.arch}/${app.branch}`)
