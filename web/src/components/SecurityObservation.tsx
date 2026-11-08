@@ -3,6 +3,8 @@ import type { Inventory } from "../../../scripts/security-model.ts";
 import type { SecurityView } from "../data.ts";
 import { Badge } from "./ui/badge.tsx";
 import { Freshness } from "./Freshness.tsx";
+import { VulnerabilityObservation } from "./VulnerabilityObservation.tsx";
+import { CoverageObservation } from "./CoverageObservation.tsx";
 
 export function inventoryRelation(
   inventory: Inventory,
@@ -34,7 +36,10 @@ export function SecurityObservation({
     <section className="inventory-observation" aria-label="Manifest inventory">
       <div className="inventory-heading">
         <h4>
-          Manifest inventory <span>Experimental pilot</span>
+          {row?.status === "completed" && row.content_scanner
+            ? "Content and manifest inventory"
+            : "Manifest inventory"}{" "}
+          <span>Experimental pilot</span>
         </h4>
         <Badge variant={inventory ? "outline" : "secondary"}>
           {inventory
@@ -122,6 +127,16 @@ export function SecurityObservation({
                       <code>{inventory.evidence.sha256}</code>
                     </dd>
                   </div>
+                  {row.content_scanner ? (
+                    <div>
+                      <dt>Content scanner</dt>
+                      <dd>
+                        Syft {row.content_scanner.version}
+                        <br />
+                        <code>{row.content_scanner.binary_sha256}</code>
+                      </dd>
+                    </div>
+                  ) : null}
                 </>
               ) : null}
             </dl>
@@ -150,10 +165,8 @@ export function SecurityObservation({
         cleanup. The runtime is the current remote runtime, not a particular
         installed system’s runtime.
       </p>
-      <p className="app-limit">
-        <strong>Vulnerability scan: not performed.</strong> This inventory is
-        not proof of safety.
-      </p>
+      <CoverageObservation view={view} />
+      <VulnerabilityObservation view={view} />
     </section>
   );
 }

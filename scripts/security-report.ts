@@ -34,6 +34,12 @@ export function decodeSecurity(
     record.run_id !== runId ||
     record.run_attempt !== attempt ||
     (record.status === "completed" &&
+      config.analysis &&
+      (record.content_scanner?.version !== config.analysis.syft.version ||
+        record.scan === "not_requested" ||
+        (record.scan.status === "completed" &&
+          record.scan.scanner_version !== config.analysis.grype.version))) ||
+    (record.status === "completed" &&
       record.inventory.app.ref !==
         `app/${app.app_id}/${app.arch}/${app.branch}`)
   ) {
@@ -85,7 +91,7 @@ export function aggregateSecurity(
 }
 
 export function renderSecurity(rows: SecurityRow[]): string {
-  const lines = ["## Manifest inventory pilot", "", SECURITY_LIMITATIONS, ""];
+  const lines = ["## Security inventory pilot", "", SECURITY_LIMITATIONS, ""];
   for (const row of rows) {
     lines.push(`- ${row.app.app_id}: ${row.status}`);
     if (row.status === "completed") {
@@ -98,6 +104,15 @@ export function renderSecurity(rows: SecurityRow[]): string {
           `  - ${scope}: ${counts.identified}/${counts.sources} manifest sources have inferred package identities (${counts.versioned} versioned). Inventory incomplete.`,
         );
       }
+      if (row.scan !== "not_requested") {
+        lines.push(`  - Vulnerability scan: ${row.scan.status}`);
+        if (row.scan.status === "completed")
+          lines.push(
+            `  - ${row.scan.matches} scanner matches requiring triage; database built: ${row.scan.database_built}`,
+          );
+      }
+      if (row.coverage)
+        lines.push(`  - Content coverage: ${row.coverage.status}`);
     }
   }
   return lines.join("\n") + "\n";
@@ -120,7 +135,11 @@ main(import.meta, () => {
   writeJson(join(output, "security-report.json"), report);
   writeFileSync(join(output, "summary.md"), renderSecurity(report.rows));
   process.exitCode = report.rows.every(
-    (row) => row.status === "completed" || row.status === "not_requested",
+    (row) =>
+      row.status === "not_requested" ||
+      (row.status === "completed" &&
+        (row.scan === "not_requested" || row.scan.status === "completed") &&
+        (!row.coverage || row.coverage.status === "completed")),
   )
     ? 0
     : 1;

@@ -354,6 +354,14 @@ code {
 .inventory-observation details {
   margin-block: 12px;
 }
+.vulnerability-observation {
+  display: grid;
+  gap: 12px;
+  margin-block-start: 20px;
+}
+.scan-findings li + li {
+  margin-block-start: 12px;
+}
 .provenance > p {
   color: var(--muted);
 }

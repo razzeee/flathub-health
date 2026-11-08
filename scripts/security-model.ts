@@ -3,11 +3,18 @@ import { appSchema } from "./model.ts";
 
 export const INVENTORY_LIMIT = 16 * 1024 * 1024;
 export const RECORD_LIMIT = 64 * 1024;
+export const SCAN_LIMIT = 32 * 1024 * 1024;
+export const INVENTORY_PUBLICATION_LIMIT = 32 * 1024 * 1024;
+export const SECURITY_PUBLICATION_LIMIT = 128 * 1024 * 1024;
 export const SECURITY_LIMITATIONS =
-  "Manifest-derived inventory is incomplete: vendored dependencies, source archive contents, binary extra-data payloads and extensions are not fully inventoried. Manifest declarations do not prove what remains after build cleanup. The runtime is the current remote runtime, not a particular installed system's runtime. No vulnerability scan was performed; this is not proof of safety.";
+  "Inventory coverage is incomplete. Content inspection cannot identify every static or vendored dependency. Extensions are not scanned unless explicitly selected. Manifest declarations do not prove what remains after build cleanup. The runtime is the current remote runtime, not a particular installed system's runtime. Scanner matches need triage; this is not proof of safety.";
 
 const text = z.string().min(1).max(2000);
 const digest = z.string().regex(/^[a-f0-9]{64}$/);
+const tool = z.strictObject({
+  version: z.string().regex(/^\d+\.\d+\.\d+$/),
+  archive_sha256: digest,
+});
 export const securityConfigSchema = z.strictObject({
   schema_version: z.literal(1),
   // file: supports reproducible local OSTree fixtures; hosted runs use HTTPS.
@@ -19,6 +26,7 @@ export const securityConfigSchema = z.strictObject({
     rust: z.string().regex(/^\d+\.\d+\.\d+$/),
   }),
   apps: z.array(appSchema.shape.app_id).min(1).max(20),
+  analysis: z.strictObject({ syft: tool, grype: tool }).optional(),
 });
 export type SecurityConfig = z.infer<typeof securityConfigSchema>;
 
@@ -49,6 +57,70 @@ export const inventorySchema = z.strictObject({
 });
 export type Inventory = z.infer<typeof inventorySchema>;
 
+export const evidenceSchema = z.strictObject({
+  path: z.enum(["scanner-input.cdx.json", "grype.json", "coverage.json"]),
+  sha256: digest,
+  bytes: z.number().int().positive().max(SCAN_LIMIT),
+});
+export const severities = [
+  "Critical",
+  "High",
+  "Medium",
+  "Low",
+  "Negligible",
+  "Unknown",
+] as const;
+export const findingSchema = z.strictObject({
+  vulnerability: text,
+  package: text,
+  version: text,
+  severity: z.enum(severities),
+  fixes: z.array(text).max(100),
+  match_types: z.array(text).max(100),
+  scope: z.enum(["app", "runtime", "unknown"]),
+  bom_ref: text,
+});
+export type Finding = z.infer<typeof findingSchema>;
+export const coverageObservationSchema = z.discriminatedUnion("status", [
+  z.strictObject({ status: z.literal("incomplete") }),
+  z.strictObject({ status: z.literal("failed"), message: text }),
+  z.strictObject({
+    status: z.literal("completed"),
+    inventory_sha256: digest,
+    evidence: evidenceSchema.extend({ path: z.literal("coverage.json") }),
+  }),
+]);
+export type CoverageObservation = z.infer<typeof coverageObservationSchema>;
+export const scanSchema = z.union([
+  z.literal("not_requested"),
+  z.strictObject({ status: z.literal("incomplete") }),
+  z.strictObject({ status: z.literal("failed"), message: text }),
+  z.strictObject({
+    status: z.literal("completed"),
+    finished_at: z.iso.datetime({ offset: true }),
+    inventory_sha256: digest,
+    scanner_version: text,
+    scanner_sha256: digest,
+    database_built: z.iso.datetime({ offset: true }),
+    database_schema: text,
+    database_checksum: text,
+    matches: z.number().int().nonnegative(),
+    severities: z.record(z.enum(severities), z.number().int().nonnegative()),
+    scopes: z.strictObject({
+      app: z.number().int().nonnegative(),
+      runtime: z.number().int().nonnegative(),
+      unknown: z.number().int().nonnegative(),
+    }),
+    evidence: z.strictObject({
+      input: evidenceSchema.extend({
+        path: z.literal("scanner-input.cdx.json"),
+      }),
+      findings: evidenceSchema.extend({ path: z.literal("grype.json") }),
+    }),
+  }),
+]);
+export type Scan = z.infer<typeof scanSchema>;
+
 const base = {
   schema_version: z.literal(1),
   app: appSchema,
@@ -57,7 +129,7 @@ const base = {
   run_attempt: z.string().regex(/^\d+$/),
   started_at: z.iso.datetime({ offset: true }),
   generator: securityConfigSchema.shape.generator,
-  scan: z.literal("not_requested"),
+  scan: scanSchema,
 };
 export const securityRecordSchema = z.discriminatedUnion("status", [
   z.strictObject({ ...base, status: z.literal("incomplete") }),
@@ -73,7 +145,11 @@ export const securityRecordSchema = z.discriminatedUnion("status", [
     status: z.literal("completed"),
     finished_at: z.iso.datetime({ offset: true }),
     binary_sha256: digest,
+    content_scanner: z
+      .strictObject({ version: text, binary_sha256: digest })
+      .optional(),
     inventory: inventorySchema,
+    coverage: coverageObservationSchema.optional(),
   }),
 ]);
 export type SecurityRecord = z.infer<typeof securityRecordSchema>;

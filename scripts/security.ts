@@ -17,6 +17,8 @@ import type { App } from "./model.ts";
 import { command } from "./process.ts";
 import type { Executor } from "./process.ts";
 import { loadSecurity } from "./security-config.ts";
+import { scanInventory } from "./security-scan.ts";
+import { observeCoverage } from "./security-coverage.ts";
 import {
   INVENTORY_LIMIT,
   inventorySchema,
@@ -26,6 +28,13 @@ import type { Inventory, SecurityRecord } from "./security-model.ts";
 
 export function sha256(bytes: Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
+}
+
+export function describeEvidence<Path extends string>(
+  path: Path,
+  bytes: Buffer,
+) {
+  return { path, bytes: bytes.length, sha256: sha256(bytes) };
 }
 
 // Only real files beneath real directories are eligible evidence. Callers supply
@@ -86,13 +95,30 @@ export function inspectInventory(
   app: App,
   repository: string,
   version: string,
+  contentVersion?: string,
 ): Inventory {
   if (bytes.length > INVENTORY_LIMIT)
     throw new Error("inventory exceeds size limit");
   const bom = bomSchema.parse(JSON.parse(bytes.toString("utf8")));
+  const identityProperties = new Set(
+    [
+      "scope",
+      "repo-url",
+      "inventory-kind",
+      "ref",
+      "commit",
+      "manifest-path",
+      "source-type",
+      "unresolved-extension-groups",
+      "content-scanner-version:app",
+      "content-scanner-version:runtime",
+      "content-scan:app",
+      "content-scan:runtime",
+    ].map((name) => `flatpak:${name}`),
+  );
   const properties = (component: z.infer<typeof componentSchema>) => {
     const entries = component.properties.filter((p) =>
-      p.name.startsWith("flatpak:"),
+      identityProperties.has(p.name),
     );
     if (new Set(entries.map((p) => p.name)).size !== entries.length)
       throw new Error("ambiguous inventory provenance");
@@ -103,7 +129,18 @@ export function inspectInventory(
   if (
     root["flatpak:ref"] !== ref ||
     root["flatpak:repo-url"] !== repository ||
-    root["flatpak:inventory-kind"] !== "manifest-derived" ||
+    !["manifest-derived", "manifest-and-content"].includes(
+      root["flatpak:inventory-kind"] ?? "",
+    ) ||
+    (contentVersion &&
+      (root["flatpak:inventory-kind"] !== "manifest-and-content" ||
+        (["app", "runtime"] as const).some(
+          (scope) =>
+            root[`flatpak:content-scanner-version:${scope}`] !==
+              contentVersion ||
+            root[`flatpak:content-scan:${scope}`] !==
+              "syft-asar-and-native-metadata",
+        ))) ||
     !bom.metadata.tools.components.some(
       (tool) => tool.name === "flatpak-sbom" && tool.version === version,
     )
@@ -121,6 +158,7 @@ export function inspectInventory(
     throw new Error("invalid inventory references");
   }
   const snapshots: Partial<Record<"app" | "runtime", Inventory["app"]>> = {};
+  const content: Record<string, string>[] = [];
   const sources = {
     app: { sources: 0, identified: 0, versioned: 0 },
     runtime: { sources: 0, identified: 0, versioned: 0 },
@@ -128,6 +166,16 @@ export function inspectInventory(
   for (const component of bom.components) {
     const p = properties(component);
     const scope = p["flatpak:scope"];
+    if (
+      ["content-detected", "extra-data-content"].includes(
+        p["flatpak:inventory-kind"] ?? "",
+      )
+    ) {
+      if (scope !== "app" && scope !== "runtime")
+        throw new Error("invalid content scope");
+      content.push(p);
+      continue;
+    }
     if (
       (scope !== "app" && scope !== "runtime") ||
       p["flatpak:repo-url"] !== repository ||
@@ -155,6 +203,14 @@ export function inspectInventory(
     }
   }
   if (
+    content.some((p) => {
+      const snapshot = snapshots[p["flatpak:scope"] as "app" | "runtime"];
+      return (
+        !snapshot ||
+        snapshot.ref !== p["flatpak:ref"] ||
+        snapshot.commit !== p["flatpak:commit"]
+      );
+    }) ||
     snapshots.app?.ref !== ref ||
     snapshots.app.commit !== root["flatpak:commit"] ||
     !new RegExp(`^runtime/[A-Za-z0-9_.-]+/${app.arch}/[A-Za-z0-9_.-]+$`).test(
@@ -213,7 +269,9 @@ export async function observeSecurity(
     app,
     repository: config.repository,
     generator: config.generator,
-    scan: "not_requested" as const,
+    scan: config.analysis
+      ? { status: "incomplete" as const }
+      : ("not_requested" as const),
     started_at: new Date().toISOString(),
     run_id: process.env.GITHUB_RUN_ID ?? "local",
     run_attempt: process.env.GITHUB_RUN_ATTEMPT ?? "1",
@@ -252,6 +310,19 @@ export async function observeSecurity(
     if (version.stdout !== `flatpak-sbom ${config.generator.version}`)
       throw new Error("generator version mismatch");
     const binaryHash = sha256(readFileSync(binary));
+    let contentScanner;
+    if (config.analysis) {
+      const syft = JSON.parse(
+        (await execute(["syft", "version", "-o", "json"], log)).stdout,
+      );
+      if (syft.version !== config.analysis.syft.version)
+        throw new Error("content scanner version mismatch");
+      const path = (await execute(["which", "syft"], log)).stdout;
+      contentScanner = {
+        version: syft.version as string,
+        binary_sha256: sha256(readFileSync(path)),
+      };
+    }
     stage = "generate";
     await execute(
       [
@@ -262,9 +333,17 @@ export async function observeSecurity(
         config.repository,
         "--output",
         join(output, "inventory.cdx.json.tmp"),
+        ...(config.analysis
+          ? [
+              "--content-scanner",
+              "syft",
+              "--cpe-mapping",
+              "--acquire-extra-data",
+            ]
+          : []),
       ],
       log,
-      { timeoutMs: 600_000 },
+      { timeoutMs: config.analysis ? 1_800_000 : 600_000 },
     );
     stage = "validate";
     const bytes = evidenceBytes(
@@ -277,7 +356,18 @@ export async function observeSecurity(
       app,
       config.repository,
       config.generator.version,
+      config.analysis?.syft.version,
     );
+    if (config.analysis)
+      await execute(
+        [
+          "python3",
+          join(ROOT, "scripts/validate-inventory.py"),
+          join(output, "inventory.cdx.json.tmp"),
+        ],
+        log,
+        { timeoutMs: 180_000 },
+      );
     renameSync(
       join(output, "inventory.cdx.json.tmp"),
       join(output, "inventory.cdx.json"),
@@ -287,8 +377,23 @@ export async function observeSecurity(
       status: "completed",
       finished_at: new Date().toISOString(),
       binary_sha256: binaryHash,
+      ...(contentScanner ? { content_scanner: contentScanner } : {}),
       inventory,
+      ...(config.analysis
+        ? { coverage: { status: "incomplete" as const } }
+        : {}),
     };
+    if (config.analysis) {
+      save();
+      record.coverage = await observeCoverage(bytes, output, binary, execute);
+      save();
+      record.scan = await scanInventory(
+        bytes,
+        output,
+        config.analysis,
+        execute,
+      );
+    }
   } catch (error) {
     record = {
       ...base,
@@ -313,5 +418,10 @@ main(import.meta, async () => {
     { generator: args.generator },
   );
   console.log(JSON.stringify({ app_id: app.app_id, status: record.status }));
-  process.exitCode = record.status === "completed" ? 0 : 1;
+  process.exitCode =
+    record.status === "completed" &&
+    (record.scan === "not_requested" || record.scan.status === "completed") &&
+    (!record.coverage || record.coverage.status === "completed")
+      ? 0
+      : 1;
 });
