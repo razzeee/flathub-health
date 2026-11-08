@@ -102,7 +102,7 @@ test("app jobs run daily or manually and depend on successful catalog validation
       inputs: {
         inventory: {
           description:
-            "Generate experimental manifest inventories for the three pilot apps",
+            "Generate content inventories and vulnerability scans for the three pilot apps",
           type: "boolean",
           default: false,
         },
@@ -192,7 +192,7 @@ test("inventory pilot is opt-in, independently bounded, pinned and failure-repor
     "github.event_name == 'workflow_dispatch' && inputs.inventory",
   );
   assert.equal(inventory.needs, "catalog");
-  assert.equal(inventory["timeout-minutes"], 20);
+  assert.equal(inventory["timeout-minutes"], 60);
   assert.deepEqual(inventory.strategy, {
     "fail-fast": false,
     "max-parallel": 2,
@@ -206,6 +206,21 @@ test("inventory pilot is opt-in, independently bounded, pinned and failure-repor
     "${{ needs.catalog.outputs.security_revision }}",
   );
   assert.equal(checkout.with!["persist-credentials"], false);
+  assert.ok(
+    inventory.steps.some((step) =>
+      step.run?.includes("node scripts/security-tools.ts"),
+    ),
+  );
+  assert.ok(
+    inventory.steps.some((step) =>
+      step.run?.includes("timeout 10m grype db update"),
+    ),
+  );
+  assert.ok(
+    inventory.steps.some((step) =>
+      step.run?.includes("tests/security-scan.test.ts"),
+    ),
+  );
   assert.ok(
     inventory.steps.some((step) =>
       step.run?.includes('cargo +"$RUST_VERSION" build --locked --release'),
@@ -239,6 +254,18 @@ test("inventory pilot is opt-in, independently bounded, pinned and failure-repor
     "always()",
   );
   const publish = apps.jobs["publish-results"]!;
+  const verify = apps.jobs["verify-security"]!;
+  assert.deepEqual(verify.needs, ["catalog", "inventory", "security-report"]);
+  assert.ok(
+    verify.steps.some((step) =>
+      step.run?.includes("scripts/verify-security-site.ts --directory"),
+    ),
+  );
+  assert.ok(
+    publish.steps.some((step) =>
+      step.run?.includes("scripts/verify-security-site.ts --url"),
+    ),
+  );
   assert.ok(publish.steps.some((step) => step.with?.pattern === "security-*"));
   assert.ok(
     publish.steps.every(

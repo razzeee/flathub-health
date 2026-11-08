@@ -3,9 +3,19 @@
   "repository": "https://dl.flathub.org/repo",
   "generator": {
     "repository": "razzeee/flatpak-sbom",
-    "revision": "6b10e8aa8d65737c89789434d91bb56aee520992",
+    "revision": "df7bd99b153f298370548d708e9ccb6938a35b37",
     "version": "0.1.0",
     "rust": "1.98.1"
   },
-  "apps": ["org.gnome.Calculator", "org.kde.kcalc", "com.vscodium.codium"]
+  "apps": ["org.gnome.Calculator", "org.kde.kcalc", "com.vscodium.codium"],
+  "analysis": {
+    "syft": {
+      "version": "1.55.0",
+      "archive_sha256": "bb65249542db5fedeeb4d3f9b018b75e7264dbfbbb10486f044581a92f90490d"
+    },
+    "grype": {
+      "version": "0.121.0",
+      "archive_sha256": "64e07133d3486115de647a66581461dccf5c732748a0a3119077395565f15519"
+    }
+  }
 }

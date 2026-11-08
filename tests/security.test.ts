@@ -47,7 +47,7 @@ const health: ReportRow = {
   },
   error: "Fixture",
 };
-const defaultConfig = loadSecurity();
+const defaultConfig = { ...loadSecurity(), analysis: undefined };
 
 function temporary(t: { after(fn: () => void): void }) {
   const root = mkdtempSync("/tmp/opencode/health-security-");
@@ -261,6 +261,49 @@ test("generation and validation failures retain failure records, never zero find
   }
 });
 
+test("content inventory permits repeated evidence paths but requires matching pinned content provenance", () => {
+  const document = bom();
+  document.metadata.component.properties.find(
+    (p) => p.name === "flatpak:inventory-kind",
+  )!.value = "manifest-and-content";
+  for (const scope of ["app", "runtime"])
+    document.metadata.component.properties.push(
+      { name: `flatpak:content-scanner-version:${scope}`, value: "1.55.0" },
+      {
+        name: `flatpak:content-scan:${scope}`,
+        value: "syft-asar-and-native-metadata",
+      },
+    );
+  const content = {
+    "bom-ref": "content",
+    properties: [
+      { name: "flatpak:inventory-kind", value: "content-detected" },
+      { name: "flatpak:scope", value: "app" },
+      { name: "flatpak:ref", value: appRef },
+      { name: "flatpak:commit", value: appCommit },
+      { name: "flatpak:content-path", value: "/first" },
+      { name: "flatpak:content-path", value: "/second" },
+    ],
+  };
+  document.components.push(content);
+  const inspect = () =>
+    inspectInventory(
+      Buffer.from(JSON.stringify(document)),
+      app,
+      defaultConfig.repository,
+      defaultConfig.generator.version,
+      "1.55.0",
+    );
+  assert.equal(inspect().app.commit, appCommit);
+  content.properties.find((p) => p.name === "flatpak:commit")!.value =
+    runtimeCommit;
+  assert.throws(inspect, /snapshot mismatch/);
+  content.properties.find((p) => p.name === "flatpak:commit")!.value =
+    appCommit;
+  content.properties.push({ name: "flatpak:scope", value: "runtime" });
+  assert.throws(inspect, /ambiguous/);
+});
+
 test("inventory contract rejects absent scope, collisions, wrong targets and inconsistent commits", () => {
   const mutations = [
     (v: ReturnType<typeof bom>) => {
@@ -435,6 +478,14 @@ test(
         ],
       }),
     );
+    if (process.env.SECURITY_SCANNERS) {
+      const pkg = join(tree, "files/lib/node_modules/lodash");
+      mkdirSync(pkg, { recursive: true });
+      writeFileSync(
+        join(pkg, "package.json"),
+        JSON.stringify({ name: "lodash", version: "4.17.20" }),
+      );
+    }
     const appCommit = ostree(
       "commit",
       "--branch",
@@ -448,6 +499,22 @@ test(
       "[Runtime]\nname=org.example.Platform\n",
     );
     rmSync(join(tree, "files/manifest.json"));
+    if (process.env.SECURITY_SCANNERS) {
+      rmSync(join(tree, "files/lib"), { recursive: true });
+      const pkg = join(
+        tree,
+        "files/lib/python3.12/site-packages/urllib3-1.26.4.dist-info",
+      );
+      mkdirSync(pkg, { recursive: true });
+      writeFileSync(
+        join(pkg, "METADATA"),
+        "Metadata-Version: 2.1\nName: urllib3\nVersion: 1.26.4\n",
+      );
+      writeFileSync(
+        join(pkg, "RECORD"),
+        "urllib3-1.26.4.dist-info/METADATA,,\n",
+      );
+    }
     mkdirSync(join(tree, "usr"));
     writeFileSync(
       join(tree, "usr/manifest.json"),
@@ -463,6 +530,9 @@ test(
     );
     const config = setup(root, {
       ...defaultConfig,
+      analysis: process.env.SECURITY_SCANNERS
+        ? loadSecurity().analysis
+        : undefined,
       repository: pathToFileURL(repo).href,
       apps: [app.app_id],
     });
@@ -476,6 +546,23 @@ test(
     assert.equal(record.inventory.runtime.commit, runtimeCommit);
     assert.equal(record.inventory.runtime.manifest, "usr/manifest.json");
     assert.equal(record.inventory.sources.app.versioned, 1);
+    if (process.env.SECURITY_SCANNERS) {
+      assert.notEqual(record.scan, "not_requested");
+      assert.equal(
+        typeof record.scan === "object" && record.scan.status,
+        "completed",
+        JSON.stringify(record.scan),
+      );
+      for (const name of [
+        "scanner-input.cdx.json",
+        "grype.json",
+        "coverage.json",
+      ]) {
+        const dir = join(root, "downloads", `security-evidence-${app.app_id}`);
+        mkdirSync(dir, { recursive: true });
+        cpSync(join(root, "observations", app.app_id, name), join(dir, name));
+      }
+    }
     publish(root, record, config);
     const views = prepareSecurity(
       [health],
@@ -484,6 +571,58 @@ test(
       { config, apps: [app] },
     );
     assert.ok(views.security[app.app_id]!.inventoryUrl);
+    if (process.env.SECURITY_SCANNERS) {
+      const scan = views.security[app.app_id]!.scan;
+      assert.ok(scan, "validated scan evidence is published");
+      assert.ok(
+        scan.findings.some(
+          (finding) => finding.package === "lodash" && finding.scope === "app",
+        ),
+      );
+      assert.ok(
+        scan.findings.some(
+          (finding) =>
+            finding.package === "urllib3" && finding.scope === "runtime",
+        ),
+      );
+      const html = prerender("<!--app-->", {
+        rows: [health],
+        images: {},
+        runUrl: "",
+        security: views.security,
+      });
+      assert.match(html, /scanner matches requiring triage/);
+      assert.match(html, /Download Grype findings/);
+      assert.match(html, /Download exact scanner input/);
+      assert.match(html, /lodash/);
+      assert.doesNotMatch(html, /Vulnerability scan: not performed/);
+      const path = join(
+        root,
+        "downloads",
+        `security-evidence-${app.app_id}`,
+        "grype.json",
+      );
+      const raw = readFileSync(path);
+      writeFileSync(path, "{}");
+      const altered = prepareSecurity(
+        [health],
+        join(root, "downloads"),
+        join(root, "site"),
+        { config, apps: [app] },
+      );
+      assert.equal(altered.security[app.app_id]!.scan, undefined);
+      assert.equal(altered.security[app.app_id]!.row.status, "completed");
+      assert.match(
+        prerender("<!--app-->", {
+          rows: [health],
+          images: {},
+          runUrl: "",
+          security: altered.security,
+        }),
+        /Vulnerability evidence unavailable/,
+      );
+      writeFileSync(path, raw);
+    }
     assert.match(
       prerender("<!--app-->", {
         rows: [health],
