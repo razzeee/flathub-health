@@ -5,7 +5,8 @@ import { join } from "node:path";
 import { load } from "./catalog.ts";
 import { argumentsFor, main, readJson, ROOT, writeJson } from "./io.ts";
 import { healthSchema, phases, successful } from "./model.ts";
-import type { App, Health, ReportRow } from "./model.ts";
+import type { App, Health, Outcome, ReportRow } from "./model.ts";
+import { attemptState } from "./attempts.ts";
 
 function decode(value: unknown, app: App): Health {
   const record = healthSchema.parse(value);
@@ -43,6 +44,18 @@ function cell(value: unknown): string {
 }
 
 export function render(rows: ReportRow[]): string {
+  const verdict = (outcome: Outcome): string => {
+    switch (attemptState(outcome)) {
+      case "retry_recovered":
+        return "passed (retry recovery)";
+      case "retry_failed":
+        return `${outcome.status} (after one retry)`;
+      case "first_pass":
+        return "passed (first attempt)";
+      default:
+        return outcome.status;
+    }
+  };
   const lines = [
     "# Flathub health",
     "",
@@ -53,7 +66,7 @@ export function render(rows: ReportRow[]): string {
   ];
   for (const row of rows) {
     lines.push(
-      `| ${[cell(row.app.name), ...phases.map((phase) => cell(row.phases[phase].status))].join(" | ")} |`,
+      `| ${[cell(row.app.name), ...phases.map((phase) => cell(verdict(row.phases[phase])))].join(" | ")} |`,
     );
   }
   for (const row of rows) {
@@ -93,6 +106,17 @@ export function render(rows: ReportRow[]): string {
       );
       if (row.phases[phase].message)
         lines.push(`- ${phase}: ${cell(row.phases[phase].message)}`);
+      const attempts = row.phases[phase].attempts;
+      if (phase !== "prepare" && row.phases[phase].status !== "not_requested") {
+        lines.push(
+          `- ${phase} attempts: ${attempts?.length ?? "unavailable (not recorded)"}`,
+        );
+        attempts?.forEach((attempt, index) => {
+          lines.push(
+            `- ${phase} attempt ${index + 1} (${index === 0 ? phase : `retry/${phase}`}): ${cell(JSON.stringify(attempt))}`,
+          );
+        });
+      }
     }
     if ("error" in row) lines.push(cell(row.error));
   }
@@ -171,6 +195,12 @@ export function compare(current: ReportRow[], previous: Snapshot[]): string[] {
       ["screenshots", "recipe"],
     ] as const) {
       const now = row.phases[phase].status;
+      const state = attemptState(row.phases[phase]);
+      if (state === "retry_recovered" || state === "retry_failed") {
+        changes.push(
+          `- ${app} ${label}: ${state === "retry_recovered" ? "retry recovery, not a first-attempt pass" : "still failing after one retry"}`,
+        );
+      }
       const was = before?.phases[phase].status;
       const appFailure = phase === "verify" ? "app_failed" : "recipe_failed";
       if (

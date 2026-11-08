@@ -14,7 +14,7 @@ import { prepare, decodeRows } from "../web/scripts/prepare.ts";
 import { freshness, FRESHNESS_MS } from "../web/src/data.ts";
 import { loadRunner } from "../scripts/runner.ts";
 import { ROOT } from "../scripts/io.ts";
-import type { ReportRow } from "../scripts/model.ts";
+import type { Outcome, ReportRow } from "../scripts/model.ts";
 
 test("phase explanations preserve unknown causes, wrapper failures and legacy provenance", () => {
   for (const category of [
@@ -167,6 +167,65 @@ test("gallery publishes only declared captures, never diagnostic baselines or OC
   );
   assert.equal(images[0]!.phase, "verify");
   assert.equal(images[0]!.name, "Window visible");
+});
+
+test("retry reports show recovery and stage only the final attempt's captures", (t) => {
+  const root = temporary(t);
+  const row = record();
+  const failed: Outcome = {
+    status: "infrastructure_failed",
+    reason: "fixture_transient",
+  };
+  const final: Outcome = {
+    status: "infrastructure_failed",
+    message: "final failure",
+  };
+  const retried = {
+    ...row,
+    phases: { ...row.phases, verify: { ...final, attempts: [failed, final] } },
+  };
+  const report = join(root, "report.json");
+  writeFileSync(report, JSON.stringify([retried]));
+  const first = result(root, "verify", ["screenshots/window.png"]);
+  mkdirSync(join(first, "screenshots"));
+  writeFileSync(join(first, "screenshots/window.png"), "first attempt");
+  const retry = join(root, "health-org.example.Demo/retry/verify");
+  mkdirSync(join(retry, "screenshots"), { recursive: true });
+  writeFileSync(
+    join(retry, "result.json"),
+    readFileSync(join(first, "result.json")),
+  );
+  writeFileSync(join(retry, "screenshots/window.png"), "second attempt");
+  const output = join(root, "site");
+  const data = prepare(report, root, output);
+  assert.equal(data.images[app.app_id]?.length, 1);
+  assert.equal(
+    readFileSync(join(output, data.images[app.app_id]![0]!.url), "utf8"),
+    "second attempt",
+  );
+  assert.match(prerender("<!--app-->", data), /Still failing after one retry/);
+  const passed: Outcome = { status: "passed" };
+  const recovery: ReportRow = {
+    ...retried,
+    schema_version: 1,
+    app: { ...app, arch: "x86_64" },
+    phases: {
+      prepare: { status: "passed" },
+      verify: { ...passed, attempts: [failed, passed] },
+      screenshots: { status: "not_requested" },
+    },
+  };
+  assert.match(
+    prerender("<!--app-->", { ...data, rows: [recovery] }),
+    /Recovered after one retry, not a first-attempt pass/,
+  );
+  recovery.phases.verify = { ...passed, attempts: [passed] };
+  assert.match(
+    prerender("<!--app-->", { ...data, rows: [recovery] }),
+    /Passed on the first attempt/,
+  );
+  rmSync(join(retry, "result.json"));
+  assert.deepEqual(prepare(report, root, output).images[app.app_id], []);
 });
 
 test("production build prerenders validated results and no-JS links at a relative Pages base", async (t) => {

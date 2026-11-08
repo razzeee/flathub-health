@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isDeepStrictEqual } from "node:util";
 
 const line = z
   .string()
@@ -46,7 +47,7 @@ export const executionSchema = z.looseObject({
   exit_code: z.number().int().nullable(),
   cleanup: z.record(z.string(), z.looseObject({ status: line })).nullable(),
 });
-export const outcomeSchema = z.strictObject({
+const attemptSchema = z.strictObject({
   status: statusSchema,
   message: z.string().optional(),
   exit_code: z.number().int().nullable().optional(),
@@ -71,6 +72,27 @@ export const outcomeSchema = z.strictObject({
     })
     .optional(),
 });
+export const outcomeSchema = attemptSchema
+  .extend({ attempts: z.array(attemptSchema).min(1).max(2).optional() })
+  .superRefine(({ attempts, ...outcome }, context) => {
+    if (attempts && !isDeepStrictEqual(outcome, attempts.at(-1))) {
+      context.addIssue({
+        code: "custom",
+        path: ["attempts"],
+        message: "final outcome must match the last attempt",
+      });
+    }
+    if (
+      attempts?.length === 2 &&
+      attempts[0]?.status !== "infrastructure_failed"
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["attempts", 0],
+        message: "only infrastructure failures may be retried",
+      });
+    }
+  });
 export type Outcome = z.infer<typeof outcomeSchema>;
 
 export const digestSchema = line.regex(
@@ -106,6 +128,13 @@ export const healthSchema = z
   })
   .superRefine((record, context) => {
     for (const phase of phases) {
+      if (phase === "prepare" && record.phases[phase].attempts) {
+        context.addIssue({
+          code: "custom",
+          path: ["phases", phase, "attempts"],
+          message: "preparation does not support retries",
+        });
+      }
       const allowed: Status[] = [
         "passed",
         "incomplete",

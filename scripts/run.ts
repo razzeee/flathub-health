@@ -20,8 +20,9 @@ import {
 } from "./model.ts";
 import type { App, Health, Mode, Outcome } from "./model.ts";
 import { loadRunner } from "./runner.ts";
-import { command, CommandError } from "./process.ts";
+import { command } from "./process.ts";
 import type { Executor } from "./process.ts";
+import { retryPhase } from "./retry.ts";
 
 const appReasons = new Set([
   "launch_failed",
@@ -194,6 +195,7 @@ interface RunOptions {
   root?: string;
   execute?: Executor;
   invoke?: Invoker;
+  retryable?: (outcome: Outcome) => boolean;
 }
 
 export async function runApp(
@@ -335,32 +337,31 @@ export async function runApp(
     save();
     for (const mode of ["verify", "screenshots"] as const) {
       if (mode === "screenshots" && !app.recipe) continue;
-      try {
-        record.phases[mode] = await invokeRunner({
-          app,
-          mode,
-          image: config[`${mode}_digest`]!,
-          runnerVersion: config.version,
-          runnerImageName: config[`${mode}_image`],
-          repo,
-          dependencyRepo,
-          output,
-          runner,
-          env,
-          root,
-          execute,
-        });
-      } catch (error) {
-        record.phases[mode] = {
-          status: "infrastructure_failed",
-          message: message(error),
-        };
-        if (error instanceof CommandError && error.cancelled) {
+      await retryPhase(
+        async (attempt) => {
+          const attemptOutput = attempt === 1 ? output : join(output, "retry");
+          mkdirSync(attemptOutput, { recursive: true });
+          return invokeRunner({
+            app,
+            mode,
+            image: config[`${mode}_digest`]!,
+            runnerVersion: config.version,
+            runnerImageName: config[`${mode}_image`],
+            repo,
+            dependencyRepo,
+            output: attemptOutput,
+            runner,
+            env,
+            root,
+            execute,
+          });
+        },
+        (outcome) => {
+          record.phases[mode] = outcome;
           save();
-          throw error;
-        }
-      }
-      save();
+        },
+        options.retryable,
+      );
     }
   } catch (error) {
     if (record.phases.prepare.status !== "passed") {

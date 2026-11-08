@@ -35,6 +35,10 @@ Done when reports distinguish a retry recovery from a first-attempt pass and
 tests enforce the retry limit. Open a separate notification issue only after
 choosing who receives alerts, which changes qualify, and how to avoid duplicates.
 
+Bounded attempt tracking, retry recovery reporting and retry-limit tests are now
+implemented. The [retry policy and evidence](retries.md) explain why the production
+allowlist remains empty; enabling a real retry signature still needs evidence.
+
 ## Deferred
 
 App-release triggers, additional architectures, automatic upstream issue filing,

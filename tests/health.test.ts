@@ -542,6 +542,8 @@ test("failed startup still runs the recipe, with immutable images", async (t) =>
   });
   assert.deepEqual(calls, ["verify", "screenshots"]);
   assert.equal(row.phases.screenshots.status, "passed");
+  assert.deepEqual(row.phases.verify.attempts, [{ status: "app_failed" }]);
+  assert.deepEqual(row.phases.screenshots.attempts, [{ status: "passed" }]);
   assert.equal(row.resolved.version, "1.0");
 });
 
@@ -579,6 +581,94 @@ test("upstream screenshot failure preserves completed startup results", async (t
   const reported = aggregate([app()], join(root, "artifacts"));
   assert.equal(reported[0]!.phases.verify.status, "passed");
   assert.equal(reported[0]!.phases.screenshots.status, "infrastructure_failed");
+});
+
+test("a retry uses unchanged inputs and separate artifacts while preserving the first failure", async (t) => {
+  const root = temporary(t);
+  mockRunner(root);
+  const config = loadRunner(root);
+  const invocations: Record<string, string>[] = [];
+  const output = join(root, "artifacts", app().app_id);
+  const execute: Executor = async (args, log, options) => {
+    exportFixture(args);
+    if (!args[1]?.endsWith("action/run.py"))
+      return {
+        code: 0,
+        stdout: args.at(-1) === "HEAD" ? config.revision : "example",
+      };
+    const inputs: Record<string, string> = JSON.parse(
+      options!.env!.FLATPAK_SMOKE_INPUTS!,
+    );
+    invocations.push(inputs);
+    const failed = invocations.length === 1;
+    if (invocations.length === 2) {
+      const saved = readJson(join(output, "health.json")) as Health;
+      assert.equal(
+        saved.phases.verify.attempts?.[0]?.reason,
+        "fixture_transient",
+      );
+    }
+    const destination = join(root, inputs.output!);
+    mkdirSync(destination, { recursive: true });
+    writeJson(join(destination, "result.json"), {
+      schema_version: 1,
+      status: failed ? "failed" : "passed",
+      app_ref: inputs["app-ref"],
+      failure: failed
+        ? {
+            reason: "fixture_transient",
+            category: "infrastructure",
+            message: "first failure",
+          }
+        : null,
+      phase_metadata: {
+        app: { ref: inputs["app-ref"], commit: "same-app-commit" },
+      },
+    });
+    writeJson(`${destination}.execution.json`, {
+      schema_version: 1,
+      status: "completed",
+      exit_code: failed ? 1 : 0,
+      cleanup: { remove: { status: "ok" } },
+    });
+    writeFileSync(log, failed ? "first log" : "later log");
+    return { code: failed ? 1 : 0, stdout: "" };
+  };
+  const row = await runApp(app(), root, join(root, "artifacts"), {
+    root,
+    execute,
+    retryable: (outcome) => outcome.reason === "fixture_transient",
+  });
+  assert.equal(invocations.length, 3);
+  const { output: firstPath, ...firstInputs } = invocations[0]!;
+  const { output: secondPath, ...secondInputs } = invocations[1]!;
+  assert.deepEqual(firstInputs, secondInputs);
+  assert.equal(firstPath, `artifacts/${app().app_id}/verify`);
+  assert.equal(secondPath, `artifacts/${app().app_id}/retry/verify`);
+  assert.equal(invocations[2]!.output, `artifacts/${app().app_id}/screenshots`);
+  assert.equal(row.phases.verify.status, "passed");
+  assert.equal(row.phases.verify.attempts?.length, 2);
+  assert.equal(
+    row.phases.verify.attempts?.[0]?.metadata?.app?.commit,
+    "same-app-commit",
+  );
+  assert.equal(
+    row.phases.verify.attempts?.[1]?.metadata?.app?.commit,
+    "same-app-commit",
+  );
+  assert.equal(readFileSync(join(output, "verify.log"), "utf8"), "first log");
+  assert.equal(
+    readFileSync(join(output, "retry/verify.log"), "utf8"),
+    "later log",
+  );
+  assert.equal(
+    (readJson(join(output, "verify/result.json")) as { status: string }).status,
+    "failed",
+  );
+  assert.equal(
+    aggregate([app()], join(root, "artifacts"))[0]!.phases.verify.status,
+    "passed",
+  );
 });
 
 test("upstream startup failure does not suppress screenshot invocation", async (t) => {
@@ -940,6 +1030,63 @@ test("passing artifacts require app and runner version details regardless of JSO
   assert.ok(readJson(file));
 });
 
+test("reports distinguish retry recoveries, persistent failures, first passes and legacy results", (t) => {
+  const row = record();
+  const failed = {
+    status: "infrastructure_failed" as const,
+    reason: "fixture_transient",
+    message: "original <failure>",
+    metadata: {
+      app: { ref: row.resolved.ref!, commit: "first-app-commit" },
+      runtimes: [{ ref: "runtime/example", commit: "first-runtime-commit" }],
+      recipe: null,
+      runner_image: { version: "v0.5.1", image: "example", digest: null },
+    },
+  };
+  const passed = {
+    status: "passed" as const,
+    metadata: {
+      ...failed.metadata,
+      app: { ...failed.metadata.app, commit: "second-app-commit" },
+    },
+  };
+  row.phases.verify = { ...passed, attempts: [failed, passed] };
+  row.phases.screenshots = {
+    status: "passed",
+    attempts: [{ status: "passed" }],
+  };
+  const root = temporary(t);
+  mkdirSync(join(root, row.app.app_id));
+  writeJson(join(root, row.app.app_id, "health.json"), row);
+  const rows = aggregate([row.app], root);
+  const rendered = render(rows);
+  assert.match(rendered, /passed \(retry recovery\)/);
+  assert.match(rendered, /passed \(first attempt\)/);
+  assert.match(rendered, /verify attempt 1 \(verify\)/);
+  assert.match(rendered, /verify attempt 2 \(retry\/verify\)/);
+  for (const evidence of [
+    "first-app-commit",
+    "first-runtime-commit",
+    "second-app-commit",
+    "original &lt;failure&gt;",
+  ])
+    assert.ok(rendered.includes(evidence), evidence);
+  assert.ok(
+    compare(rows, []).some((line) =>
+      line.includes("retry recovery, not a first-attempt pass"),
+    ),
+  );
+  row.phases.verify = { ...failed, attempts: [failed, failed] };
+  assert.match(render([row]), /infrastructure_failed \(after one retry\)/);
+  assert.ok(
+    compare([row], []).some((line) =>
+      line.includes("still failing after one retry"),
+    ),
+  );
+  assert.match(render([record()]), /unavailable \(not recorded\)/);
+  assert.doesNotMatch(render([record()]), /first attempt|retry recovery/);
+});
+
 test("artifact schemas reject malformed metadata, phase outcomes, and version details", (t) => {
   const root = temporary(t);
   const path = join(root, app().app_id);
@@ -970,6 +1117,13 @@ test("artifact schemas reject malformed metadata, phase outcomes, and version de
     {
       ...valid,
       phases: { ...valid.phases, prepare: { status: "app_failed" } },
+    },
+    {
+      ...valid,
+      phases: {
+        ...valid.phases,
+        prepare: { status: "passed", attempts: [{ status: "passed" }] },
+      },
     },
     {
       ...valid,
