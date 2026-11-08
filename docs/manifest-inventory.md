@@ -12,7 +12,7 @@ vulnerability scans for the three pilot apps**. Scheduled runs leave this pilot
 off. A subsequent run replaces the page, without carrying forward older findings.
 
 For a local run, install Node 24, pnpm, Rust/rustup, Git, OSTree, Python,
-`jsonschema` and `referencing`, then prepare the pinned tools:
+then prepare the pinned tools and schema validator:
 
 ```sh
 pnpm install --frozen-lockfile
@@ -22,7 +22,9 @@ git -C .sbom checkout --detach "$(node scripts/security-config.ts --field revisi
 rustup toolchain install "$(node scripts/security-config.ts --field rust)" --profile minimal
 cargo +"$(node scripts/security-config.ts --field rust)" build --locked --release --manifest-path .sbom/Cargo.toml
 node scripts/security-tools.ts
-export PATH="$PWD/.sbom/target/tools:$PATH"
+python3 -m venv .sbom/target/validation-venv
+.sbom/target/validation-venv/bin/pip install jsonschema==4.26.0 referencing==0.37.0
+export PATH="$PWD/.sbom/target/validation-venv/bin:$PWD/.sbom/target/tools:$PATH"
 grype db update
 export GRYPE_DB_AUTO_UPDATE=false
 node scripts/security.ts --app org.gnome.Calculator

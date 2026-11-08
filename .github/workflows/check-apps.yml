@@ -84,11 +84,14 @@ jobs:
         env:
           RUST_VERSION: ${{ needs.catalog.outputs.security_rust }}
         run: |
-          sudo apt-get update && sudo apt-get install -y ostree python3-jsonschema python3-referencing
+          sudo apt-get update && sudo apt-get install -y ostree python3-venv
           rustup toolchain install "$RUST_VERSION" --profile minimal
           cargo +"$RUST_VERSION" build --locked --release --manifest-path .sbom/Cargo.toml
       - name: Install pinned content and vulnerability scanners
         run: |
+          python3 -m venv .sbom/target/validation-venv
+          .sbom/target/validation-venv/bin/pip install jsonschema==4.26.0 referencing==0.37.0
+          echo "$PWD/.sbom/target/validation-venv/bin" >> "$GITHUB_PATH"
           node scripts/security-tools.ts
           echo "$PWD/.sbom/target/tools" >> "$GITHUB_PATH"
       - name: Prepare a current vulnerability database

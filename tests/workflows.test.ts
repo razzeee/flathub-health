@@ -213,6 +213,11 @@ test("inventory pilot is opt-in, independently bounded, pinned and failure-repor
   );
   assert.ok(
     inventory.steps.some((step) =>
+      step.run?.includes("pip install jsonschema==4.26.0 referencing==0.37.0"),
+    ),
+  );
+  assert.ok(
+    inventory.steps.some((step) =>
       step.run?.includes("timeout 10m grype db update"),
     ),
   );
