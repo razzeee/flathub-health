@@ -111,6 +111,8 @@ export function renderSecurity(rows: SecurityRow[]): string {
             `  - ${row.scan.matches} scanner matches requiring triage; database built: ${row.scan.database_built}`,
           );
       }
+      if (row.coverage)
+        lines.push(`  - Content coverage: ${row.coverage.status}`);
     }
   }
   return lines.join("\n") + "\n";
@@ -136,7 +138,8 @@ main(import.meta, () => {
     (row) =>
       row.status === "not_requested" ||
       (row.status === "completed" &&
-        (row.scan === "not_requested" || row.scan.status === "completed")),
+        (row.scan === "not_requested" || row.scan.status === "completed") &&
+        (!row.coverage || row.coverage.status === "completed")),
   )
     ? 0
     : 1;

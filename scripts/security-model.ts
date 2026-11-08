@@ -4,6 +4,8 @@ import { appSchema } from "./model.ts";
 export const INVENTORY_LIMIT = 16 * 1024 * 1024;
 export const RECORD_LIMIT = 64 * 1024;
 export const SCAN_LIMIT = 32 * 1024 * 1024;
+export const INVENTORY_PUBLICATION_LIMIT = 32 * 1024 * 1024;
+export const SECURITY_PUBLICATION_LIMIT = 128 * 1024 * 1024;
 export const SECURITY_LIMITATIONS =
   "Inventory coverage is incomplete. Content inspection cannot identify every static or vendored dependency. Extensions are not scanned unless explicitly selected. Manifest declarations do not prove what remains after build cleanup. The runtime is the current remote runtime, not a particular installed system's runtime. Scanner matches need triage; this is not proof of safety.";
 
@@ -79,6 +81,16 @@ export const findingSchema = z.strictObject({
   bom_ref: text,
 });
 export type Finding = z.infer<typeof findingSchema>;
+export const coverageObservationSchema = z.discriminatedUnion("status", [
+  z.strictObject({ status: z.literal("incomplete") }),
+  z.strictObject({ status: z.literal("failed"), message: text }),
+  z.strictObject({
+    status: z.literal("completed"),
+    inventory_sha256: digest,
+    evidence: evidenceSchema.extend({ path: z.literal("coverage.json") }),
+  }),
+]);
+export type CoverageObservation = z.infer<typeof coverageObservationSchema>;
 export const scanSchema = z.union([
   z.literal("not_requested"),
   z.strictObject({ status: z.literal("incomplete") }),
@@ -104,7 +116,6 @@ export const scanSchema = z.union([
         path: z.literal("scanner-input.cdx.json"),
       }),
       findings: evidenceSchema.extend({ path: z.literal("grype.json") }),
-      coverage: evidenceSchema.extend({ path: z.literal("coverage.json") }),
     }),
   }),
 ]);
@@ -138,6 +149,7 @@ export const securityRecordSchema = z.discriminatedUnion("status", [
       .strictObject({ version: text, binary_sha256: digest })
       .optional(),
     inventory: inventorySchema,
+    coverage: coverageObservationSchema.optional(),
   }),
 ]);
 export type SecurityRecord = z.infer<typeof securityRecordSchema>;

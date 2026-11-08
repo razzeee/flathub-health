@@ -18,6 +18,7 @@ import { command } from "./process.ts";
 import type { Executor } from "./process.ts";
 import { loadSecurity } from "./security-config.ts";
 import { scanInventory } from "./security-scan.ts";
+import { observeCoverage } from "./security-coverage.ts";
 import {
   INVENTORY_LIMIT,
   inventorySchema,
@@ -27,6 +28,13 @@ import type { Inventory, SecurityRecord } from "./security-model.ts";
 
 export function sha256(bytes: Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
+}
+
+export function describeEvidence<Path extends string>(
+  path: Path,
+  bytes: Buffer,
+) {
+  return { path, bytes: bytes.length, sha256: sha256(bytes) };
 }
 
 // Only real files beneath real directories are eligible evidence. Callers supply
@@ -371,13 +379,17 @@ export async function observeSecurity(
       binary_sha256: binaryHash,
       ...(contentScanner ? { content_scanner: contentScanner } : {}),
       inventory,
+      ...(config.analysis
+        ? { coverage: { status: "incomplete" as const } }
+        : {}),
     };
     if (config.analysis) {
+      save();
+      record.coverage = await observeCoverage(bytes, output, binary, execute);
       save();
       record.scan = await scanInventory(
         bytes,
         output,
-        binary,
         config.analysis,
         execute,
       );
@@ -408,7 +420,8 @@ main(import.meta, async () => {
   console.log(JSON.stringify({ app_id: app.app_id, status: record.status }));
   process.exitCode =
     record.status === "completed" &&
-    (record.scan === "not_requested" || record.scan.status === "completed")
+    (record.scan === "not_requested" || record.scan.status === "completed") &&
+    (!record.coverage || record.coverage.status === "completed")
       ? 0
       : 1;
 });

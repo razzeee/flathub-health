@@ -1,17 +1,16 @@
 import type { Mode, ReportRow } from "../../scripts/model.ts";
 import type { SecurityRow } from "../../scripts/security-model.ts";
 import type { Finding } from "../../scripts/security-model.ts";
-import type { Coverage } from "../../scripts/security-scan.ts";
+import type { Coverage } from "../../scripts/security-coverage.ts";
 
 export interface SecurityView {
   row: SecurityRow;
   inventoryUrl?: string;
   evidenceUnavailable?: boolean;
+  coverage?: { summary: Coverage; url: string };
   scan?: {
     findings: Finding[];
-    coverage: Coverage;
     findingsUrl: string;
-    coverageUrl: string;
     inputUrl: string;
   };
 }

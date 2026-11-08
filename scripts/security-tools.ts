@@ -4,6 +4,7 @@ import { loadSecurity } from "./security-config.ts";
 import { main, ROOT } from "./io.ts";
 import { command } from "./process.ts";
 import { sha256 } from "./security.ts";
+import { responseBytes } from "./http.ts";
 
 main(import.meta, async () => {
   if (process.platform !== "linux" || process.arch !== "x64")
@@ -19,17 +20,7 @@ main(import.meta, async () => {
       `https://github.com/anchore/${name}/releases/download/v${pin.version}/${archive}`,
       { signal: AbortSignal.timeout(120_000) },
     );
-    if (!response.ok)
-      throw new Error(`${name} download failed: ${response.status}`);
-    const chunks: Uint8Array[] = [];
-    let size = 0;
-    for await (const chunk of response.body!) {
-      size += chunk.length;
-      if (size > 100 * 1024 * 1024)
-        throw new Error("security tool archive exceeds size limit");
-      chunks.push(chunk);
-    }
-    const bytes = Buffer.concat(chunks);
+    const bytes = await responseBytes(response, 100 * 1024 * 1024);
     if (sha256(bytes) !== pin.archive_sha256)
       throw new Error(`${name} archive checksum mismatch`);
     const path = join(output, archive);

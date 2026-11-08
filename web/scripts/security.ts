@@ -8,8 +8,11 @@ import { loadSecurity } from "../../scripts/security-config.ts";
 import { decodeSecurity } from "../../scripts/security-report.ts";
 import { evidenceBytes, inspectInventory } from "../../scripts/security.ts";
 import { validateScan } from "../../scripts/security-scan.ts";
+import { validateCoverage } from "../../scripts/security-coverage.ts";
 import {
   INVENTORY_LIMIT,
+  INVENTORY_PUBLICATION_LIMIT,
+  SECURITY_PUBLICATION_LIMIT,
   SCAN_LIMIT,
   securityReportSchema,
   securityRowSchema,
@@ -108,19 +111,50 @@ export function prepareSecurity(
               config.generator.version,
               config.analysis?.syft.version,
             );
-            if (
-              !isDeepStrictEqual(inventory, row.inventory) ||
-              inventoryBytes + bytes.length > 32 * 1024 * 1024
-            )
-              throw new Error(
-                "inventory evidence mismatch or publication limit exceeded",
-              );
+            if (!isDeepStrictEqual(inventory, row.inventory))
+              throw new Error("inventory evidence mismatch");
             const dir = join(output, "inventories", app.app_id);
-            mkdirSync(dir, { recursive: true });
-            writeFileSync(join(dir, "inventory.cdx.json"), bytes);
-            totalBytes += bytes.length;
-            inventoryBytes += bytes.length;
-            view.inventoryUrl = `inventories/${encodeURIComponent(app.app_id)}/inventory.cdx.json`;
+            const publish = (
+              files: { name: string; bytes: Buffer }[],
+              inventory = false,
+            ) => {
+              const size = files.reduce(
+                (sum, file) => sum + file.bytes.length,
+                0,
+              );
+              if (
+                totalBytes + size > SECURITY_PUBLICATION_LIMIT ||
+                (inventory &&
+                  inventoryBytes + size > INVENTORY_PUBLICATION_LIMIT)
+              )
+                throw new Error("evidence publication limit exceeded");
+              mkdirSync(dir, { recursive: true });
+              for (const file of files) {
+                writeFileSync(join(dir, file.name), file.bytes);
+                totalBytes += file.bytes.length;
+                if (inventory) inventoryBytes += file.bytes.length;
+              }
+            };
+            publish([{ name: "inventory.cdx.json", bytes }], true);
+            const base = `inventories/${encodeURIComponent(app.app_id)}`;
+            view.inventoryUrl = `${base}/inventory.cdx.json`;
+            if (row.coverage?.status === "completed") {
+              try {
+                const coverage = evidenceBytes(
+                  artifacts,
+                  [`security-evidence-${app.app_id}`, "coverage.json"],
+                  SCAN_LIMIT,
+                );
+                const summary = validateCoverage(row.coverage, {
+                  inventory: bytes,
+                  coverage,
+                });
+                publish([{ name: "coverage.json", bytes: coverage }]);
+                view.coverage = { summary, url: `${base}/coverage.json` };
+              } catch {
+                view.evidenceUnavailable = true;
+              }
+            }
             if (
               row.scan !== "not_requested" &&
               row.scan.status === "completed"
@@ -132,41 +166,26 @@ export function prepareSecurity(
                   [`security-evidence-${app.app_id}`, "scanner-input.cdx.json"],
                   SCAN_LIMIT,
                 );
-                const raw = evidenceBytes(
+                const findings = evidenceBytes(
                   artifacts,
                   [`security-evidence-${app.app_id}`, "grype.json"],
                   SCAN_LIMIT,
                 );
-                const coverage = evidenceBytes(
-                  artifacts,
-                  [`security-evidence-${app.app_id}`, "coverage.json"],
-                  SCAN_LIMIT,
-                );
-                if (
-                  totalBytes + input.length + raw.length + coverage.length >
-                  128 * 1024 * 1024
-                )
-                  throw new Error("scan publication limit exceeded");
-                const inspected = validateScan(
-                  scan,
-                  bytes,
+                const inspected = validateScan(scan, {
+                  inventory: bytes,
                   input,
-                  raw,
-                  coverage,
-                );
+                  findings,
+                });
                 if (scan.scanner_version !== config.analysis?.grype.version)
                   throw new Error("unexpected scanner version");
-                writeFileSync(join(dir, "scanner-input.cdx.json"), input);
-                writeFileSync(join(dir, "grype.json"), raw);
-                writeFileSync(join(dir, "coverage.json"), coverage);
-                totalBytes += input.length + raw.length + coverage.length;
-                const base = `inventories/${encodeURIComponent(app.app_id)}`;
+                publish([
+                  { name: "scanner-input.cdx.json", bytes: input },
+                  { name: "grype.json", bytes: findings },
+                ]);
                 view.scan = {
-                  findings: inspected.findings.slice(0, 200),
-                  coverage: inspected.coverage,
+                  findings: inspected.slice(0, 200),
                   findingsUrl: `${base}/grype.json`,
                   inputUrl: `${base}/scanner-input.cdx.json`,
-                  coverageUrl: `${base}/coverage.json`,
                 };
               } catch {
                 view.evidenceUnavailable = true;

@@ -50,7 +50,9 @@ use `--output artifacts/another-run` rather than overwriting evidence.
    for Grype. As in the pinned generator, quarantined identities and references
    to them are excluded. Both original and projected bytes are retained. The
    integration does not invoke `scan REF`, which would generate a second SBOM.
-4. Grype scans that projection. Its version, binary digest, database build time
+4. Coverage is recorded against the saved inventory before starting Grype. It
+   remains independently available if scanning fails or its evidence is rejected.
+   Grype scans the projection. Its version, binary digest, database build time
    and database archive checksum are retained with normalized severity and scope
    counts. Package/advisory matches are not unique vulnerability totals.
 5. Publication revalidates all hashes, byte sizes, projection identity and

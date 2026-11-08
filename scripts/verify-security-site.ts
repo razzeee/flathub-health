@@ -10,6 +10,8 @@ import { INVENTORY_LIMIT, SCAN_LIMIT } from "./security-model.ts";
 import type { SecurityConfig } from "./security-model.ts";
 import type { App } from "./model.ts";
 import { validateScan } from "./security-scan.ts";
+import { validateCoverage } from "./security-coverage.ts";
+import { responseBytes } from "./http.ts";
 
 const pageSchema = z.object({
   security: z.record(
@@ -17,6 +19,7 @@ const pageSchema = z.object({
     z.object({
       row: z.unknown(),
       scan: z.unknown().optional(),
+      coverage: z.unknown().optional(),
       inventoryUrl: z.string().optional(),
     }),
   ),
@@ -54,7 +57,9 @@ export async function verifySecuritySite(
       record.status !== "completed" ||
       record.scan === "not_requested" ||
       record.scan.status !== "completed" ||
-      !view?.scan
+      !view?.scan ||
+      record.coverage?.status !== "completed" ||
+      !view.coverage
     )
       throw new Error(
         `${app.app_id}: a validated content inventory and scan are required`,
@@ -77,33 +82,41 @@ export async function verifySecuritySite(
       view.inventoryUrl !== `${base}/inventory.cdx.json`
     )
       throw new Error("published inventory mismatch");
-    const [input, raw, coverage] = await Promise.all(
+    const [input, findings, coverage] = await Promise.all(
       ["scanner-input.cdx.json", "grype.json", "coverage.json"].map((path) =>
         get([...parts, path], SCAN_LIMIT),
       ),
     );
-    const validated = validateScan(
-      record.scan,
+    const validated = validateScan(record.scan, {
       inventory,
-      input!,
-      raw!,
-      coverage!,
-    );
+      input: input!,
+      findings: findings!,
+    });
+    const summary = validateCoverage(record.coverage, {
+      inventory,
+      coverage: coverage!,
+    });
     if (
       !isDeepStrictEqual(view.scan, {
-        findings: validated.findings.slice(0, 200),
-        coverage: validated.coverage,
+        findings: validated.slice(0, 200),
         findingsUrl: `${base}/grype.json`,
-        coverageUrl: `${base}/coverage.json`,
         inputUrl: `${base}/scanner-input.cdx.json`,
       })
     )
       throw new Error("published scan view mismatch");
+    if (
+      !isDeepStrictEqual(view.coverage, {
+        summary,
+        url: `${base}/coverage.json`,
+      })
+    )
+      throw new Error("published coverage view mismatch");
     proofs.push({
       app_id: app.app_id,
       inventory_sha256: inspected.evidence.sha256,
       scanner_input_sha256: record.scan.evidence.input.sha256,
       findings_sha256: record.scan.evidence.findings.sha256,
+      coverage_sha256: record.coverage.evidence.sha256,
       matches: record.scan.matches,
     });
   }
@@ -122,17 +135,7 @@ main(import.meta, async () => {
       new URL(parts.map(encodeURIComponent).join("/"), base),
       { cache: "no-store", signal: AbortSignal.timeout(60_000) },
     );
-    if (!response.ok)
-      throw new Error(`published evidence returned ${response.status}`);
-    const chunks: Uint8Array[] = [];
-    let size = 0;
-    for await (const chunk of response.body!) {
-      size += chunk.length;
-      if (size > limit)
-        throw new Error("published evidence exceeds size limit");
-      chunks.push(chunk);
-    }
-    return Buffer.concat(chunks);
+    return responseBytes(response, limit);
   };
   const proofs = await verifySecuritySite(get);
   console.log(

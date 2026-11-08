@@ -5,7 +5,7 @@ import { z } from "zod";
 import { message } from "./model.ts";
 import type { Executor } from "./process.ts";
 import { ROOT } from "./io.ts";
-import { evidenceBytes, sha256 } from "./security.ts";
+import { describeEvidence, evidenceBytes, sha256 } from "./security.ts";
 import {
   findingSchema,
   SCAN_LIMIT,
@@ -154,33 +154,9 @@ export function inspectScan(bytes: Buffer, inventory: Buffer) {
   };
 }
 
-const scopeCoverage = z.object({
-  content_scan: z.string().max(2000),
-  content_packages: z.number().int().nonnegative(),
-  gaps: z
-    .array(z.unknown())
-    .max(100_000)
-    .transform((gaps) => gaps.length),
-});
-export const coverageSchema = z.object({
-  inventory_complete: z.literal(false),
-  acquisition_complete: z.boolean(),
-  completeness_limitations: z.array(z.string()).max(100),
-  scopes: z.object({ app: scopeCoverage, runtime: scopeCoverage }),
-});
-export type Coverage = z.infer<typeof coverageSchema>;
-
-function evidence(
-  path: "scanner-input.cdx.json" | "grype.json" | "coverage.json",
-  bytes: Buffer,
-) {
-  return { path, bytes: bytes.length, sha256: sha256(bytes) };
-}
-
 export async function scanInventory(
   inventory: Buffer,
   output: string,
-  generator: string,
   config: NonNullable<SecurityConfig["analysis"]>,
   execute: Executor,
 ): Promise<Scan> {
@@ -204,16 +180,6 @@ export async function scanInventory(
       log,
       { timeoutMs: 180_000 },
     );
-    const coverage = Buffer.from(
-      (
-        await execute(
-          [generator, "coverage", join(output, "inventory.cdx.json")],
-          log,
-        )
-      ).stdout,
-    );
-    coverageSchema.parse(JSON.parse(coverage.toString("utf8")));
-    writeFileSync(join(output, "coverage.json"), coverage);
     await execute(
       [
         "grype",
@@ -237,9 +203,8 @@ export async function scanInventory(
       scanner_sha256: scannerHash,
       ...summary,
       evidence: {
-        input: evidence("scanner-input.cdx.json", input),
-        findings: evidence("grype.json", raw),
-        coverage: evidence("coverage.json", coverage),
+        input: describeEvidence("scanner-input.cdx.json", input),
+        findings: describeEvidence("grype.json", raw),
       },
     });
   } catch (error) {
@@ -247,38 +212,37 @@ export async function scanInventory(
   }
 }
 
+export interface ScanEvidence {
+  inventory: Buffer;
+  input: Buffer;
+  findings: Buffer;
+}
+
 export function validateScan(
   scan: Extract<Scan, { status: "completed" }>,
-  inventory: Buffer,
-  input: Buffer,
-  raw: Buffer,
-  coverage: Buffer,
+  evidence: ScanEvidence,
 ) {
   if (
-    scan.inventory_sha256 !== sha256(inventory) ||
-    !input.equals(scannerInput(inventory))
+    scan.inventory_sha256 !== sha256(evidence.inventory) ||
+    !evidence.input.equals(scannerInput(evidence.inventory))
   )
     throw new Error("scan input mismatch");
   for (const [key, bytes] of [
-    ["input", input],
-    ["findings", raw],
-    ["coverage", coverage],
+    ["input", evidence.input],
+    ["findings", evidence.findings],
   ] as const) {
     if (
       !isDeepStrictEqual(
-        evidence(scan.evidence[key].path, bytes),
+        describeEvidence(scan.evidence[key].path, bytes),
         scan.evidence[key],
       )
     )
       throw new Error("scan evidence mismatch");
   }
-  const inspected = inspectScan(raw, input);
+  const inspected = inspectScan(evidence.findings, evidence.input);
   for (const [key, value] of Object.entries(inspected.summary)) {
     if (!isDeepStrictEqual(scan[key as keyof typeof inspected.summary], value))
       throw new Error("scan summary mismatch");
   }
-  return {
-    findings: inspected.findings,
-    coverage: coverageSchema.parse(JSON.parse(coverage.toString("utf8"))),
-  };
+  return inspected.findings;
 }

@@ -14,6 +14,11 @@ import {
 } from "../scripts/security-scan.ts";
 import { sha256 } from "../scripts/security.ts";
 import { verifySecuritySite } from "../scripts/verify-security-site.ts";
+import {
+  observeCoverage,
+  validateCoverage,
+} from "../scripts/security-coverage.ts";
+import { responseBytes } from "../scripts/http.ts";
 
 const config = loadSecurity();
 test("publication proof cannot succeed with missing page data or missing target records", async () => {
@@ -178,43 +183,29 @@ test("scan failures remain failures and publication rejects altered evidence and
         stdout: JSON.stringify({ version: config.analysis!.grype.version }),
       };
     if (args[0] === "which") return { code: 0, stdout: join(root, "binary") };
-    if (args[1] === "coverage")
-      return { code: 0, stdout: JSON.stringify(coverage) };
     writeFileSync(args[args.indexOf("--file") + 1]!, JSON.stringify(report()));
     return { code: 0, stdout: "" };
   };
   writeFileSync(join(root, "binary"), "fixture binary");
   const bytes = inventory();
-  const result = await scanInventory(
-    bytes,
-    root,
-    "generator",
-    config.analysis!,
-    execute,
-  );
+  const result = await scanInventory(bytes, root, config.analysis!, execute);
   assert.notEqual(result, "not_requested");
   if (result === "not_requested" || result.status !== "completed") return;
   const input = readFileSync(join(root, "scanner-input.cdx.json"));
   const raw = readFileSync(join(root, "grype.json"));
-  const coverageBytes = readFileSync(join(root, "coverage.json"));
+  const evidence = { inventory: bytes, input, findings: raw };
   assert.equal(result.inventory_sha256, sha256(bytes));
-  assert.equal(
-    validateScan(result, bytes, input, raw, coverageBytes).findings.length,
-    2,
-  );
+  assert.equal(validateScan(result, evidence).length, 2);
   assert.throws(() =>
-    validateScan(result, bytes, input, Buffer.from("{}"), coverageBytes),
+    validateScan(result, { ...evidence, findings: Buffer.from("{}") }),
   );
+  assert.throws(() => validateScan({ ...result, matches: 0 }, evidence));
   assert.throws(() =>
-    validateScan({ ...result, matches: 0 }, bytes, input, raw, coverageBytes),
-  );
-  assert.throws(() =>
-    validateScan(result, Buffer.from("{}"), input, raw, coverageBytes),
+    validateScan(result, { ...evidence, inventory: Buffer.from("{}") }),
   );
   const failed = await scanInventory(
     bytes,
     root,
-    "generator",
     config.analysis!,
     async () => {
       throw new Error("scanner unavailable");
@@ -224,6 +215,87 @@ test("scan failures remain failures and publication rejects altered evidence and
     status: "failed",
     message: "scanner unavailable",
   });
+});
+
+test("coverage evidence is independent of scanner availability and rejects tampering", async (t) => {
+  const root = temporary(t);
+  const bytes = inventory();
+  const observed = await observeCoverage(
+    bytes,
+    root,
+    "generator",
+    async () => ({ code: 0, stdout: JSON.stringify(coverage) }),
+  );
+  assert.equal(observed.status, "completed");
+  if (observed.status !== "completed") return;
+  const evidence = {
+    inventory: bytes,
+    coverage: readFileSync(join(root, "coverage.json")),
+  };
+  assert.equal(
+    validateCoverage(observed, evidence).scopes.app.content_packages,
+    1,
+  );
+  const failed = await scanInventory(
+    bytes,
+    root,
+    config.analysis!,
+    async () => {
+      throw new Error("scanner unavailable");
+    },
+  );
+  assert.deepEqual(failed, {
+    status: "failed",
+    message: "scanner unavailable",
+  });
+  assert.deepEqual(
+    readFileSync(join(root, "coverage.json")),
+    evidence.coverage,
+  );
+  assert.throws(
+    () =>
+      validateCoverage(observed, { ...evidence, coverage: Buffer.from("{}") }),
+    /mismatch/,
+  );
+  assert.throws(
+    () =>
+      validateCoverage(observed, { ...evidence, inventory: Buffer.from("{}") }),
+    /mismatch/,
+  );
+  assert.equal(
+    (
+      await observeCoverage(bytes, root, "generator", async () => {
+        throw new Error("coverage failed");
+      })
+    ).status,
+    "failed",
+  );
+});
+
+test("bounded HTTP responses reject errors, enforce byte limits and cancel oversized streams", async () => {
+  assert.deepEqual(
+    await responseBytes(new Response("1234"), 4),
+    Buffer.from("1234"),
+  );
+  assert.equal(
+    (await responseBytes(new Response(null, { status: 204 }), 0)).length,
+    0,
+  );
+  await assert.rejects(
+    responseBytes(new Response("failure", { status: 503 }), 20),
+    /503/,
+  );
+  let cancelled = false;
+  const body = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      controller.enqueue(new Uint8Array(3));
+    },
+    cancel() {
+      cancelled = true;
+    },
+  });
+  await assert.rejects(responseBytes(new Response(body), 5), /size limit/);
+  assert.equal(cancelled, true);
 });
 
 test(

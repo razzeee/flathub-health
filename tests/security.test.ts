@@ -5,11 +5,14 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
+  statSync,
   rmSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { test } from "node:test";
 import { pathToFileURL } from "node:url";
 import { loadSecurity } from "../scripts/security-config.ts";
@@ -18,12 +21,15 @@ import { aggregateSecurity } from "../scripts/security-report.ts";
 import {
   INVENTORY_LIMIT,
   securityRecordSchema,
+  INVENTORY_PUBLICATION_LIMIT,
+  SECURITY_PUBLICATION_LIMIT,
 } from "../scripts/security-model.ts";
 import type { SecurityConfig } from "../scripts/security-model.ts";
 import {
   evidenceBytes,
   inspectInventory,
   observeSecurity,
+  sha256,
 } from "../scripts/security.ts";
 import { verifySecuritySite } from "../scripts/verify-security-site.ts";
 import type { Executor } from "../scripts/process.ts";
@@ -55,7 +61,7 @@ const health: ReportRow = {
 const defaultConfig = { ...loadSecurity(), analysis: undefined };
 
 function temporary(t: { after(fn: () => void): void }) {
-  const root = mkdtempSync("/tmp/opencode/health-security-");
+  const root = mkdtempSync(join(tmpdir(), "health-security-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   return root;
 }
@@ -239,6 +245,169 @@ test("observation to publication preserves incomplete coverage, hashes and indep
       execute: executor(),
     }),
     /EEXIST/,
+  );
+});
+
+test("published coverage survives a failed vulnerability scan", async (t) => {
+  const root = temporary(t);
+  const config = setup(root);
+  const record = await observeSecurity(app, join(root, "observations"), {
+    root,
+    execute: executor(),
+  });
+  assert.equal(record.status, "completed");
+  if (record.status !== "completed") return;
+  const coverage = Buffer.from(
+    JSON.stringify({
+      inventory_complete: false,
+      acquisition_complete: true,
+      completeness_limitations: ["static dependencies"],
+      scopes: {
+        app: { content_scan: "completed", content_packages: 3, gaps: [{}] },
+        runtime: { content_scan: "completed", content_packages: 2, gaps: [] },
+      },
+    }),
+  );
+  const failed = {
+    ...record,
+    scan: { status: "failed", message: "Grype timed out" },
+    coverage: {
+      status: "completed",
+      inventory_sha256: record.inventory.evidence.sha256,
+      evidence: {
+        path: "coverage.json",
+        sha256: sha256(coverage),
+        bytes: coverage.length,
+      },
+    },
+  };
+  publish(root, failed, config);
+  writeFileSync(
+    join(root, "downloads", `security-evidence-${app.app_id}`, "coverage.json"),
+    coverage,
+  );
+  const prepared = prepareSecurity(
+    [health],
+    join(root, "downloads"),
+    join(root, "site"),
+    { config, apps: [app] },
+  );
+  const view = prepared.security[app.app_id]!;
+  assert.equal(view.row.status, "completed");
+  assert.equal(view.coverage?.summary.scopes.app.content_packages, 3);
+  assert.ok(view.coverage?.url);
+  const html = prerender("<!--app-->", {
+    ...prepared,
+    images: {},
+    runUrl: "",
+  }).replaceAll("<!-- -->", "");
+  assert.match(html, /Vulnerability scan: failed/);
+  assert.match(html, /3 package records; 1 recorded gaps/);
+  assert.match(html, /Download coverage evidence/);
+  assert.doesNotMatch(html, /scanner matches requiring triage/);
+});
+
+test("later app inventories cannot exceed the total evidence budget", async (t) => {
+  const root = temporary(t);
+  const configured = setup(root);
+  const prototype = await observeSecurity(app, join(root, "observations"), {
+    root,
+    execute: executor(),
+  });
+  assert.equal(prototype.status, "completed");
+  if (prototype.status !== "completed") return;
+  const apps = Array.from({ length: 5 }, (_, index) => ({
+    ...app,
+    app_id: `org.example.Budget${index}`,
+  }));
+  const config = { ...configured, apps: apps.map((app) => app.app_id) };
+  const downloads = join(root, "downloads");
+  const mib = 1024 * 1024;
+  for (const [index, target] of apps.entries()) {
+    const targetRef = `app/${target.app_id}/${target.arch}/${target.branch}`;
+    const inventory = Buffer.from(
+      JSON.stringify({ ...bom(), padding: "x".repeat(6 * mib) }).replaceAll(
+        appRef,
+        targetRef,
+      ),
+    );
+    const inspected = inspectInventory(
+      inventory,
+      target,
+      config.repository,
+      config.generator.version,
+    );
+    const coverage = Buffer.from(
+      JSON.stringify({
+        inventory_complete: false,
+        acquisition_complete: true,
+        completeness_limitations: [],
+        scopes: {
+          app: { content_scan: "completed", content_packages: 1, gaps: [] },
+          runtime: { content_scan: "completed", content_packages: 1, gaps: [] },
+        },
+      }).padEnd([32, 32, 32, 6, 1][index]! * mib, " "),
+    );
+    const record = {
+      ...prototype,
+      app: target,
+      inventory: inspected,
+      scan: { status: "failed", message: "scanner unavailable" },
+      coverage: {
+        status: "completed",
+        inventory_sha256: inspected.evidence.sha256,
+        evidence: {
+          path: "coverage.json",
+          bytes: coverage.length,
+          sha256: sha256(coverage),
+        },
+      },
+    };
+    const records = join(downloads, `security-record-${target.app_id}`);
+    const evidence = join(downloads, `security-evidence-${target.app_id}`);
+    mkdirSync(records, { recursive: true });
+    mkdirSync(evidence, { recursive: true });
+    writeFileSync(join(records, "security.json"), JSON.stringify(record));
+    writeFileSync(join(evidence, "inventory.cdx.json"), inventory);
+    writeFileSync(join(evidence, "coverage.json"), coverage);
+  }
+  mkdirSync(join(downloads, "security-report"));
+  writeFileSync(
+    join(downloads, "security-report/security-report.json"),
+    JSON.stringify(
+      aggregateSecurity(
+        apps,
+        downloads,
+        config,
+        true,
+        prototype.run_id,
+        prototype.run_attempt,
+      ),
+    ),
+  );
+  const output = join(root, "site");
+  const prepared = prepareSecurity([], downloads, output, { config, apps });
+  for (const target of apps.slice(0, 4))
+    assert.ok(prepared.security[target.app_id]!.coverage);
+  const last = prepared.security[apps[4]!.app_id]!;
+  assert.equal(last.inventoryUrl, undefined);
+  assert.equal(last.row.status, "completed");
+  assert.equal(last.evidenceUnavailable, true);
+  const files = readdirSync(join(output, "inventories")).flatMap((id) =>
+    readdirSync(join(output, "inventories", id)).map((name) => ({
+      path: join(output, "inventories", id, name),
+      name,
+    })),
+  );
+  assert.ok(
+    files.reduce((total, file) => total + statSync(file.path).size, 0) <=
+      SECURITY_PUBLICATION_LIMIT,
+  );
+  assert.ok(
+    files
+      .filter((file) => file.name === "inventory.cdx.json")
+      .reduce((total, file) => total + statSync(file.path).size, 0) <=
+      INVENTORY_PUBLICATION_LIMIT,
   );
 });
 

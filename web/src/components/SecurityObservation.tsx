@@ -4,6 +4,7 @@ import type { SecurityView } from "../data.ts";
 import { Badge } from "./ui/badge.tsx";
 import { Freshness } from "./Freshness.tsx";
 import { VulnerabilityObservation } from "./VulnerabilityObservation.tsx";
+import { CoverageObservation } from "./CoverageObservation.tsx";
 
 export function inventoryRelation(
   inventory: Inventory,
@@ -164,6 +165,7 @@ export function SecurityObservation({
         cleanup. The runtime is the current remote runtime, not a particular
         installed system’s runtime.
       </p>
+      <CoverageObservation view={view} />
       <VulnerabilityObservation view={view} />
     </section>
   );
