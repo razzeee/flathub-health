@@ -205,7 +205,7 @@ test("observation to publication preserves incomplete coverage, hashes and indep
     security: view.security,
   });
   assert.match(html, /Generated · incomplete coverage/);
-  assert.match(html, /FRESHNESS UNVERIFIED/);
+  assert.match(html, /Freshness unverified/);
   assert.match(html, /Vulnerability scan: not performed/);
   assert.match(html, /not proof of safety/);
   assert.match(html, /Download CycloneDX 1.7/);
@@ -421,6 +421,10 @@ test("findings are published and rendered separately by fix ownership, with per-
       security: prepared.security,
     });
   const html = render().replaceAll("<!-- -->", "");
+  assert.match(
+    html,
+    /<summary>Inventory &amp; security <span>\d+ scanner matches requiring triage<\/span><\/summary>/,
+  );
   const group = (title: string) =>
     html.split(`<section aria-label="${title}">`)[1]!.split("</section>")[0]!;
   assert.match(group("App dependencies"), /App maintainers: update/);

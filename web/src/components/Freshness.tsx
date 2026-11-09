@@ -38,12 +38,12 @@ export function Freshness({
   const isFresh = now !== null && freshness(testedAt, now);
   const known = Number.isFinite(Date.parse(testedAt));
   const label = !hasRows
-    ? "NO RESULTS"
+    ? "No results"
     : now === null
-      ? "FRESHNESS UNVERIFIED"
+      ? "Freshness unverified"
       : isFresh
-        ? "FRESH"
-        : "STALE / UNAVAILABLE";
+        ? "Fresh"
+        : "Stale / unavailable";
   return (
     <div
       id={id}

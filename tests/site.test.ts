@@ -53,8 +53,10 @@ test("phase explanations preserve unknown causes, wrapper failures and legacy pr
     assert.match(rendered, /remove: failed/);
     assert.match(rendered, /Unknown, no recipe and fixture digest/);
     assert.match(rendered, /splash/);
-    if (!category || category === "future-category")
+    if (!category || category === "future-category") {
       assert.match(rendered, /Unclassified failure/);
+      assert.match(rendered, /aria-label="Recipe: Unclassified failure"/);
+    }
     if (category === "expectation")
       assert.match(rendered, /cause is not established/);
   }
@@ -92,7 +94,7 @@ test("report copy keeps test limits and useful labels without promotional text",
     images: {},
     runUrl: "https://github.com/razzeee/flathub-health/actions",
   });
-  assert.match(html, /Release <em>checks\.<\/em>/);
+  assert.match(html, /<h1>Release checks<\/h1>/);
   assert.match(html, /class="freshness" role="status"/);
   assert.match(html, /data-fresh="false"/);
   assert.doesNotMatch(html, /role="alert"/);
@@ -113,6 +115,25 @@ test("report copy keeps test limits and useful labels without promotional text",
     html,
     /A window into|THE RELEASE CHECK|READING THESE RESULTS/,
   );
+});
+
+test("app navigation exposes phase outcomes and supplemental evidence remains available", () => {
+  const html = prerender("<!--app-->", {
+    rows: decodeRows([record()]),
+    images: {},
+    runUrl: "https://github.com/razzeee/flathub-health/actions",
+  });
+  assert.match(html, /aria-label="Apps in this report"/);
+  assert.match(html, /href="#app-org.example.Demo"/);
+  assert.match(html, /aria-label="Startup: Incomplete"/);
+  assert.match(html, /aria-label="Recipe: Not requested"/);
+  assert.match(html.replaceAll(/<!--.*?-->/g, ""), /1 app in this run/);
+  assert.match(html, /<details class="security-details">/);
+  assert.match(html, /Inventory &amp; security/);
+  assert.match(html, /<span>Inventory unavailable<\/span><\/summary>/);
+  assert.match(html, /Manifest inventory/);
+  assert.match(html, /Missing or incomplete evidence/);
+  assert.doesNotMatch(html, /app-number|index-number|NaN%|Infinity%/);
 });
 
 function result(
@@ -247,7 +268,7 @@ test("production build prerenders validated results and no-JS links at a relativ
   const output = join(root, "site");
   await build(report, root, output);
   const html = readFileSync(join(output, "index.html"), "utf8");
-  assert.match(html, /FRESHNESS UNVERIFIED/);
+  assert.match(html, /Freshness unverified/);
   assert.match(html, /&lt;Demo&gt;/);
   assert.match(html, /<details>/);
   assert.match(html, /href="screenshots\/org.example.Demo\/verify\/0.png"/);
@@ -279,7 +300,7 @@ test("prerendered data cannot break out of its script or corrupt replacement tex
     images: {},
     runUrl: "https://github.com/razzeee/flathub-health/actions",
   });
-  assert.match(missing, /NO RESULTS/);
+  assert.match(missing, /No results/);
   assert.match(missing, /No apps are assumed to have passed/);
 });
 
