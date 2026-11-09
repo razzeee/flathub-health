@@ -154,6 +154,12 @@ export function inspectScan(bytes: Buffer, inventory: Buffer) {
   };
 }
 
+export function publishedFindings(findings: Finding[]): Finding[] {
+  return (["app", "runtime", "unknown"] as const).flatMap((scope) =>
+    findings.filter((finding) => finding.scope === scope).slice(0, 200),
+  );
+}
+
 export async function scanInventory(
   inventory: Buffer,
   output: string,

@@ -9,7 +9,7 @@ import { evidenceBytes, inspectInventory } from "./security.ts";
 import { INVENTORY_LIMIT, SCAN_LIMIT } from "./security-model.ts";
 import type { SecurityConfig } from "./security-model.ts";
 import type { App } from "./model.ts";
-import { validateScan } from "./security-scan.ts";
+import { publishedFindings, validateScan } from "./security-scan.ts";
 import { validateCoverage } from "./security-coverage.ts";
 import { responseBytes } from "./http.ts";
 
@@ -98,7 +98,7 @@ export async function verifySecuritySite(
     });
     if (
       !isDeepStrictEqual(view.scan, {
-        findings: validated.slice(0, 200),
+        findings: publishedFindings(validated),
         findingsUrl: `${base}/grype.json`,
         inputUrl: `${base}/scanner-input.cdx.json`,
       })

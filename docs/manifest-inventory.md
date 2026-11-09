@@ -62,7 +62,9 @@ use `--output artifacts/another-run` rather than overwriting evidence.
 The page shows app/runtime manifest-source counts, content package records and
 coverage gaps, severity and attribution counts, package versions, supplied fixes,
 match types, independent inventory/database freshness and smoke comparisons.
-It renders at most 200 matches per app; the complete Grype report is downloadable.
+Findings are grouped by app dependencies, runtime dependencies and unknown
+attribution, with guidance on where to fix them. Each group renders at most 200
+matches (600 per app); the complete Grype report is downloadable.
 It also offers the original inventory, exact scanner input and coverage evidence.
 Logs and binaries remain in Actions artifacts, never in the generated page.
 
