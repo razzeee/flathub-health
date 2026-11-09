@@ -3,7 +3,7 @@
   "repository": "https://dl.flathub.org/repo",
   "generator": {
     "repository": "razzeee/flatpak-sbom",
-    "revision": "df7bd99b153f298370548d708e9ccb6938a35b37",
+    "revision": "8286b67edcde2274fc4cf904811ffbe80e93c673",
     "version": "0.1.0",
     "rust": "1.98.1"
   },
