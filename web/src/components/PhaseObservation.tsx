@@ -33,32 +33,35 @@ export function PhaseObservation({ outcome }: { outcome: Outcome }) {
       {outcome.reason ? <code>{outcome.reason}</code> : null}
       {outcome.message ? <p>{outcome.message}</p> : null}
       {execution ? (
-        <dl className="execution-details">
-          <div>
-            <dt>Execution</dt>
-            <dd>
-              {execution.status === "completed"
-                ? "Finished"
-                : execution.status.replaceAll("_", " ")}
-              {execution.exit_code !== null
-                ? ` · exit ${execution.exit_code}`
-                : " · exit unknown"}
-            </dd>
-          </div>
-          <div>
-            <dt>Cleanup</dt>
-            <dd>
-              {execution.cleanup && Object.keys(execution.cleanup).length
-                ? Object.entries(execution.cleanup)
-                    .map(
-                      ([stage, result]) =>
-                        `${stage}: ${result.status === "absent" ? "container already absent" : result.status}`,
-                    )
-                    .join("; ")
-                : "Not recorded"}
-            </dd>
-          </div>
-        </dl>
+        <details className="execution-disclosure">
+          <summary>Execution diagnostics</summary>
+          <dl className="execution-details">
+            <div>
+              <dt>Execution</dt>
+              <dd>
+                {execution.status === "completed"
+                  ? "Finished"
+                  : execution.status.replaceAll("_", " ")}
+                {execution.exit_code !== null
+                  ? ` · exit ${execution.exit_code}`
+                  : " · exit unknown"}
+              </dd>
+            </div>
+            <div>
+              <dt>Cleanup</dt>
+              <dd>
+                {execution.cleanup && Object.keys(execution.cleanup).length
+                  ? Object.entries(execution.cleanup)
+                      .map(
+                        ([stage, result]) =>
+                          `${stage}: ${result.status === "absent" ? "container already absent" : result.status}`,
+                      )
+                      .join("; ")
+                  : "Not recorded"}
+              </dd>
+            </div>
+          </dl>
+        </details>
       ) : outcome.status !== "not_requested" ? (
         <p className="execution-missing">Execution diagnostics unavailable.</p>
       ) : null}

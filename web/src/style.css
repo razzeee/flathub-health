@@ -34,7 +34,7 @@
   --color-popover: var(--card);
   --color-popover-foreground: var(--ink);
   --color-primary: var(--green);
-  --color-primary-foreground: light-dark(#fffef9, #112519);
+  --color-primary-foreground: light-dark(#ffffff, #111a2a);
   --color-secondary: var(--surface);
   --color-secondary-foreground: var(--muted);
   --color-muted: var(--surface);
@@ -59,14 +59,7 @@ body {
   font-family: var(--font-sans);
 }
 code,
-pre,
-.eyebrow,
-.edition,
-.section-heading > span,
-.app-number,
-.index-number,
-.tested > span,
-figcaption {
+pre {
   font-family: var(--font-mono);
 }
 .capture-trigger {
@@ -136,13 +129,6 @@ figcaption svg {
   }
   .topline-actions {
     gap: 12px;
-  }
-  .hero {
-    gap: 16px;
-    padding-block: 24px;
-  }
-  h1 {
-    font-size: clamp(2.8rem, 9vw, 4.5rem);
   }
 }
 @media (max-width: 420px) {
