@@ -26,6 +26,7 @@ import {
 } from "../scripts/security-model.ts";
 import type { SecurityConfig } from "../scripts/security-model.ts";
 import {
+  describeEvidence,
   evidenceBytes,
   inspectInventory,
   observeSecurity,
@@ -37,6 +38,7 @@ import type { App, ReportRow } from "../scripts/model.ts";
 import { prepareSecurity } from "../web/scripts/security.ts";
 import { build, prerender } from "../web/scripts/build.ts";
 import { inventoryRelation } from "../web/src/components/SecurityObservation.tsx";
+import { inspectScan, scannerInput } from "../scripts/security-scan.ts";
 
 const app: App = {
   app_id: "org.example.Demo",
@@ -305,6 +307,172 @@ test("published coverage survives a failed vulnerability scan", async (t) => {
   assert.match(html, /3 package records; 1 recorded gaps/);
   assert.match(html, /Download coverage evidence/);
   assert.doesNotMatch(html, /scanner matches requiring triage/);
+});
+
+test("findings are published and rendered separately by fix ownership, with per-group limits", async (t) => {
+  const root = temporary(t);
+  setup(root);
+  const document = bom();
+  document.metadata.component.properties.find(
+    (property) => property.name === "flatpak:inventory-kind",
+  )!.value = "manifest-and-content";
+  for (const scope of ["app", "runtime"])
+    document.metadata.component.properties.push(
+      {
+        name: `flatpak:content-scanner-version:${scope}`,
+        value: loadSecurity().analysis!.syft.version,
+      },
+      {
+        name: `flatpak:content-scan:${scope}`,
+        value: "syft-asar-and-native-metadata",
+      },
+    );
+  const record = await observeSecurity(app, join(root, "observations"), {
+    root,
+    execute: executor(document),
+  });
+  assert.equal(record.status, "completed");
+  if (record.status !== "completed") return;
+  const config = {
+    ...defaultConfig,
+    apps: [app.app_id],
+    analysis: loadSecurity().analysis,
+  };
+  record.content_scanner = {
+    version: config.analysis!.syft.version,
+    binary_sha256: "a".repeat(64),
+  };
+  const input = scannerInput(Buffer.from(JSON.stringify(document)));
+  const match = (scope: string, index: number) => ({
+    artifact: { id: scope, name: `${scope}-package-${index}`, version: "1.0" },
+    vulnerability: {
+      id: `CVE-${scope}-${index}`,
+      severity: "High",
+      fix: { versions: ["2.0"] },
+    },
+    matchDetails: [{ type: "exact-direct-match" }],
+  });
+  const findings = Buffer.from(
+    JSON.stringify({
+      descriptor: {
+        version: config.analysis!.grype.version,
+        db: {
+          status: {
+            built: "2026-11-08T00:00:00Z",
+            from: `https://example.org/db?checksum=sha256:${"a".repeat(64)}`,
+            schemaVersion: "v6.1.10",
+            valid: true,
+          },
+        },
+      },
+      matches: [
+        ...Array.from({ length: 205 }, (_, i) => match("runtime", i)),
+        match("app", 0),
+        match("unknown", 0),
+      ],
+    }),
+  );
+  const { summary } = inspectScan(findings, input);
+  record.scan = {
+    status: "completed",
+    finished_at: "2026-11-08T01:00:00Z",
+    inventory_sha256: record.inventory.evidence.sha256,
+    scanner_sha256: "a".repeat(64),
+    ...summary,
+    evidence: {
+      input: describeEvidence("scanner-input.cdx.json", input),
+      findings: describeEvidence("grype.json", findings),
+    },
+  };
+  const coverage = Buffer.from(
+    JSON.stringify({
+      inventory_complete: false,
+      acquisition_complete: true,
+      completeness_limitations: [],
+      scopes: {
+        app: { content_scan: "completed", content_packages: 1, gaps: [] },
+        runtime: { content_scan: "completed", content_packages: 1, gaps: [] },
+      },
+    }),
+  );
+  record.coverage = {
+    status: "completed",
+    inventory_sha256: record.inventory.evidence.sha256,
+    evidence: describeEvidence("coverage.json", coverage),
+  };
+  publish(root, record, config);
+  const evidence = join(root, "downloads", `security-evidence-${app.app_id}`);
+  writeFileSync(join(evidence, "scanner-input.cdx.json"), input);
+  writeFileSync(join(evidence, "grype.json"), findings);
+  writeFileSync(join(evidence, "coverage.json"), coverage);
+  const prepared = prepareSecurity(
+    [health],
+    join(root, "downloads"),
+    join(root, "site"),
+    { config, apps: [app] },
+  );
+  const view = prepared.security[app.app_id]!;
+  assert.equal(view.scan?.findings.length, 202, JSON.stringify(view));
+  const render = () =>
+    prerender("<!--app-->", {
+      rows: [health],
+      images: {},
+      runUrl: "",
+      security: prepared.security,
+    });
+  const html = render().replaceAll("<!-- -->", "");
+  const group = (title: string) =>
+    html.split(`<section aria-label="${title}">`)[1]!.split("</section>")[0]!;
+  assert.match(group("App dependencies"), /App maintainers: update/);
+  assert.match(group("App dependencies"), /app-package-0/);
+  assert.doesNotMatch(group("App dependencies"), /runtime-package/);
+  assert.match(group("Runtime dependencies"), /Runtime maintainers: update/);
+  assert.match(group("Runtime dependencies"), /Showing 200 of 205 matches/);
+  assert.doesNotMatch(group("Runtime dependencies"), /app-package/);
+  assert.match(group("Unknown attribution"), /Triage the package origin/);
+  assert.match(group("Unknown attribution"), /unknown-package-0/);
+  assert.match(html, /Fix versions: 2.0/);
+  assert.match(html, /exact-direct-match/);
+  assert.match(html, /Download Grype findings/);
+  const pagePath = join(root, "site/index.html");
+  const template =
+    '<!--app--><script id="page-data" type="application/json"></script>';
+  const writePage = () =>
+    writeFileSync(
+      pagePath,
+      prerender(template, {
+        rows: [health],
+        images: {},
+        runUrl: "",
+        security: prepared.security,
+      }),
+    );
+  writePage();
+  const get = async (parts: string[], limit: number) =>
+    evidenceBytes(join(root, "site"), parts, limit);
+  assert.equal(
+    (await verifySecuritySite(get, { config, apps: [app] })).length,
+    1,
+  );
+  const published = view.scan!.findings;
+  view.scan!.findings = inspectScan(findings, input).findings.slice(0, 200);
+  writePage();
+  await assert.rejects(
+    verifySecuritySite(get, { config, apps: [app] }),
+    /published scan view mismatch/,
+  );
+  view.scan!.findings = published;
+  if (
+    view.row.status !== "completed" ||
+    view.row.scan === "not_requested" ||
+    view.row.scan.status !== "completed"
+  )
+    return;
+  view.row.scan.scopes.app = 0;
+  view.scan!.findings = view.scan!.findings.filter(
+    (finding) => finding.scope !== "app",
+  );
+  assert.match(render(), /No scanner matches attributed to this group/);
 });
 
 test("later app inventories cannot exceed the total evidence budget", async (t) => {

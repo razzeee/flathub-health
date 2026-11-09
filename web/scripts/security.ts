@@ -7,7 +7,10 @@ import type { App, ReportRow } from "../../scripts/model.ts";
 import { loadSecurity } from "../../scripts/security-config.ts";
 import { decodeSecurity } from "../../scripts/security-report.ts";
 import { evidenceBytes, inspectInventory } from "../../scripts/security.ts";
-import { validateScan } from "../../scripts/security-scan.ts";
+import {
+  publishedFindings,
+  validateScan,
+} from "../../scripts/security-scan.ts";
 import { validateCoverage } from "../../scripts/security-coverage.ts";
 import {
   INVENTORY_LIMIT,
@@ -183,7 +186,7 @@ export function prepareSecurity(
                   { name: "grype.json", bytes: findings },
                 ]);
                 view.scan = {
-                  findings: inspected.slice(0, 200),
+                  findings: publishedFindings(inspected),
                   findingsUrl: `${base}/grype.json`,
                   inputUrl: `${base}/scanner-input.cdx.json`,
                 };
