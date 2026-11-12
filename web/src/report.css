@@ -387,8 +387,182 @@ code {
   gap: 12px;
   margin-block-start: 20px;
 }
-.scan-findings li + li {
-  margin-block-start: 12px;
+.vulnerability-observation {
+  --critical: light-dark(#a12b38, #ffadb7);
+}
+.vulnerability-observation > p {
+  max-width: 76ch;
+  margin: 0;
+}
+.scan-freshness .freshness {
+  padding-block: 3px;
+}
+.scan-limits {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+.vulnerability-observation > .scan-limits {
+  margin-block: 0;
+}
+.scan-limits > summary {
+  padding-block: 0;
+}
+.scan-limits > p {
+  max-width: 76ch;
+  margin-block: 8px;
+}
+.scan-severities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 28px;
+  margin: 4px 0;
+  padding-block: 16px;
+  border-block: 1px solid var(--line);
+}
+.scan-severities > div {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 2px;
+}
+.scan-severities dt {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+.scan-severities dd {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 650;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.scan-severities > [data-empty="true"] dd {
+  color: var(--muted);
+  font-weight: 400;
+}
+.scan-severities [data-severity="Critical"]:not([data-empty="true"]) dd,
+.finding-score[data-severity="Critical"],
+.finding-severity[data-severity="Critical"] {
+  color: var(--critical);
+}
+.finding-severity[data-severity="High"] {
+  color: var(--caution);
+}
+.scan-order {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+.finding-group {
+  min-width: 0;
+  padding-block-start: 20px;
+}
+.finding-group-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+.finding-group-heading h5 {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 650;
+}
+.finding-group-heading > span {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+.finding-guidance {
+  max-width: 76ch;
+  color: var(--muted);
+  margin-block: 6px 0;
+}
+.finding-disclosure > summary {
+  font-weight: 600;
+}
+.scan-findings {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.finding-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 20px;
+  padding-block: 18px;
+  border-top: 1px solid var(--line);
+}
+.finding-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  align-self: start;
+  padding-block: 8px;
+  background: var(--paper);
+  border-radius: 6px;
+  color: var(--ink);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.finding-score-value {
+  font-size: 1.625rem;
+  line-height: 1.15;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.025em;
+}
+.finding-content {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.finding-identity {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+}
+.finding-identity > strong {
+  font-size: 1rem;
+  font-weight: 650;
+}
+.finding-identity > span {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+.finding-identity > .finding-severity {
+  margin-inline-start: auto;
+  font-weight: 600;
+}
+.finding-advisory {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  margin-block: 2px 8px;
+}
+.finding-fix {
+  margin: 0;
+  font-size: 0.875rem;
+}
+.finding-fix[data-available="true"] > span {
+  color: var(--pass);
+  font-weight: 600;
+}
+.finding-fix[data-available="false"] {
+  color: var(--muted);
+}
+.finding-evidence {
+  font-size: 0.75rem;
+}
+.finding-disclosure .finding-evidence {
+  margin-block: 4px 0;
+}
+.finding-evidence > summary {
+  color: var(--muted);
+  padding-block: 4px;
+}
+.finding-evidence > p {
+  color: var(--muted);
+  max-width: 72ch;
+  margin-block: 6px;
 }
 .provenance > p {
   color: var(--muted);
@@ -719,6 +893,22 @@ footer {
   }
 }
 @media (max-width: 560px) {
+  .finding-row {
+    grid-template-columns: 48px minmax(0, 1fr);
+    gap: 12px;
+  }
+  .finding-score-value {
+    font-size: 1.375rem;
+  }
+  .finding-identity > .finding-severity {
+    flex-basis: 100%;
+    margin-inline-start: 0;
+  }
+  .scan-severities {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
   .topline {
     font-size: 0.8125rem;
     padding-block: 16px;

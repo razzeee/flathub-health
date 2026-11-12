@@ -8,6 +8,7 @@ import { command } from "../scripts/process.ts";
 import type { Executor } from "../scripts/process.ts";
 import {
   inspectScan,
+  publishedFindings,
   scannerInput,
   scanInventory,
   validateScan,
@@ -171,6 +172,86 @@ test("scan validates provenance, severity, fixes and unknown attribution rather 
     assert.throws(() =>
       inspectScan(Buffer.from(JSON.stringify(value)), inventory()),
     );
+});
+
+test("scan retains the highest valid primary or related CVSS score and its provenance", () => {
+  const score = (baseScore: unknown, version = "3.1", source = "nvd") => ({
+    version,
+    source,
+    metrics: { baseScore },
+  });
+  const inspect = (cvss: unknown[], related: unknown[] = []) => {
+    const data = report();
+    const match = data.matches[0]!;
+    return inspectScan(
+      Buffer.from(
+        JSON.stringify({
+          ...data,
+          matches: [
+            {
+              ...match,
+              vulnerability: { ...match.vulnerability, cvss },
+              relatedVulnerabilities: [{ cvss: related }],
+            },
+          ],
+        }),
+      ),
+      inventory(),
+    ).findings[0]!;
+  };
+  assert.deepEqual(inspect([score(7.5), score(9.8)]).cvss, {
+    score: 9.8,
+    version: "3.1",
+    source: "nvd",
+  });
+  assert.deepEqual(inspect([score(7.5)], [score(9.9, "4.0", "vendor")]).cvss, {
+    score: 9.9,
+    version: "4.0",
+    source: "vendor",
+  });
+  assert.equal(inspect([score(0)]).cvss?.score, 0);
+  assert.equal(inspect([]).cvss, undefined);
+  assert.equal(
+    inspect([null, {}, score(-1), score(11), score("9.8")]).cvss,
+    undefined,
+  );
+});
+
+test("publication sorts CVSS before limiting each scope and falls back to severity with stable ties", () => {
+  const base = inspectScan(Buffer.from(JSON.stringify(report())), inventory())
+    .findings[0]!;
+  const findings = [
+    ...Array.from({ length: 205 }, (_, i) => ({
+      ...base,
+      vulnerability: `CVE-low-${i}`,
+      severity: "Low" as const,
+    })),
+    { ...base, vulnerability: "CVE-high", severity: "Critical" as const },
+    {
+      ...base,
+      vulnerability: "CVE-score-b",
+      cvss: { score: 9.8, version: "3.1" },
+    },
+    {
+      ...base,
+      vulnerability: "CVE-score-a",
+      cvss: { score: 9.8, version: "3.1" },
+    },
+    { ...base, vulnerability: "CVE-zero", cvss: { score: 0, version: "3.1" } },
+    { ...base, scope: "runtime" as const },
+    { ...base, scope: "unknown" as const },
+  ];
+  const original = [...findings];
+  const result = publishedFindings(findings);
+  assert.deepEqual(
+    result.slice(0, 4).map((f) => f.vulnerability),
+    ["CVE-score-a", "CVE-score-b", "CVE-zero", "CVE-high"],
+  );
+  assert.equal(result.length, 202);
+  assert.equal(result[200]!.scope, "runtime");
+  assert.equal(result[201]!.scope, "unknown");
+  assert.deepEqual(findings, original);
+  assert.deepEqual(publishedFindings([...findings].reverse()), result);
 });
 
 test("scan failures remain failures and publication rejects altered evidence and summaries", async (t) => {

@@ -63,6 +63,11 @@ export function scannerInput(bytes: Buffer): Buffer {
   return Buffer.from(JSON.stringify(document));
 }
 
+const cvssSchema = z.object({
+  version: z.string().min(1).max(2000),
+  source: z.string().min(1).max(2000).optional(),
+  metrics: z.object({ baseScore: z.number().min(0).max(10) }),
+});
 const reportSchema = z.object({
   descriptor: z.object({
     version: z.string(),
@@ -82,7 +87,11 @@ const reportSchema = z.object({
           id: z.string().min(1),
           severity: z.string(),
           fix: z.object({ versions: z.array(z.string()) }).optional(),
+          cvss: z.array(z.unknown()).nullish(),
         }),
+        relatedVulnerabilities: z
+          .array(z.object({ cvss: z.array(z.unknown()).nullish() }))
+          .nullish(),
         artifact: z.object({
           id: z.string().min(1),
           name: z.string().min(1),
@@ -122,11 +131,28 @@ export function inspectScan(bytes: Buffer, inventory: Buffer) {
       severities.find((s) => s === match.vulnerability.severity) ?? "Unknown";
     counts[severity]++;
     scopes[scope]++;
+    const scores = [
+      ...(match.vulnerability.cvss ?? []),
+      ...(match.relatedVulnerabilities ?? []).flatMap((v) => v.cvss ?? []),
+    ].flatMap((value) => {
+      const parsed = cvssSchema.safeParse(value);
+      return parsed.success
+        ? [
+            {
+              score: parsed.data.metrics.baseScore,
+              version: parsed.data.version,
+              source: parsed.data.source,
+            },
+          ]
+        : [];
+    });
+    const cvss = scores.toSorted((a, b) => b.score - a.score)[0];
     return findingSchema.parse({
       vulnerability: match.vulnerability.id,
       package: match.artifact.name,
       version: match.artifact.version || "Unknown",
       severity,
+      ...(cvss ? { cvss } : {}),
       fixes: match.vulnerability.fix?.versions ?? [],
       match_types: [...new Set(match.matchDetails?.map((m) => m.type) ?? [])],
       scope,
@@ -155,8 +181,17 @@ export function inspectScan(bytes: Buffer, inventory: Buffer) {
 }
 
 export function publishedFindings(findings: Finding[]): Finding[] {
+  const ordered = findings.toSorted(
+    (a, b) =>
+      (b.cvss?.score ?? -1) - (a.cvss?.score ?? -1) ||
+      severities.indexOf(a.severity) - severities.indexOf(b.severity) ||
+      a.vulnerability.localeCompare(b.vulnerability, "en") ||
+      a.package.localeCompare(b.package, "en") ||
+      a.version.localeCompare(b.version, "en") ||
+      a.bom_ref.localeCompare(b.bom_ref, "en"),
+  );
   return (["app", "runtime", "unknown"] as const).flatMap((scope) =>
-    findings.filter((finding) => finding.scope === scope).slice(0, 200),
+    ordered.filter((finding) => finding.scope === scope).slice(0, 200),
   );
 }
 

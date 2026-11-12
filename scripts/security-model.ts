@@ -75,6 +75,13 @@ export const findingSchema = z.strictObject({
   package: text,
   version: text,
   severity: z.enum(severities),
+  cvss: z
+    .strictObject({
+      score: z.number().min(0).max(10),
+      version: text,
+      source: text.optional(),
+    })
+    .optional(),
   fixes: z.array(text).max(100),
   match_types: z.array(text).max(100),
   scope: z.enum(["app", "runtime", "unknown"]),

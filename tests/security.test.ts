@@ -349,6 +349,13 @@ test("findings are published and rendered separately by fix ownership, with per-
       id: `CVE-${scope}-${index}`,
       severity: "High",
       fix: { versions: ["2.0"] },
+      ...(index === 204
+        ? {
+            cvss: [
+              { version: "3.1", source: "nvd", metrics: { baseScore: 9.8 } },
+            ],
+          }
+        : {}),
     },
     matchDetails: [{ type: "exact-direct-match" }],
   });
@@ -426,16 +433,30 @@ test("findings are published and rendered separately by fix ownership, with per-
     /<summary>Inventory &amp; security <span>\d+ scanner matches requiring triage<\/span><\/summary>/,
   );
   const group = (title: string) =>
-    html.split(`<section aria-label="${title}">`)[1]!.split("</section>")[0]!;
+    html.split(`<section aria-label="${title}"`)[1]!.split("</section>")[0]!;
   assert.match(group("App dependencies"), /App maintainers: update/);
   assert.match(group("App dependencies"), /app-package-0/);
   assert.doesNotMatch(group("App dependencies"), /runtime-package/);
   assert.match(group("Runtime dependencies"), /Runtime maintainers: update/);
   assert.match(group("Runtime dependencies"), /Showing 200 of 205 matches/);
+  assert.equal(
+    view.scan!.findings.find((f) => f.scope === "runtime")!.vulnerability,
+    "CVE-runtime-204",
+  );
+  assert.match(group("Runtime dependencies"), /CVSS 3.1: 9.8 \(nvd\)/);
+  assert.match(group("App dependencies"), /CVSS: not supplied/);
+  assert.match(html, /Highest CVSS first in each group/);
+  assert.match(html, /<summary>How to triage these matches<\/summary>/);
+  assert.match(html, /Scores do not confirm exposure in this app/);
   assert.doesNotMatch(group("Runtime dependencies"), /app-package/);
   assert.match(group("Unknown attribution"), /Triage the package origin/);
   assert.match(group("Unknown attribution"), /unknown-package-0/);
-  assert.match(html, /Fix versions: 2.0/);
+  assert.match(html, /Fix versions<\/span>: 2.0/);
+  assert.match(
+    group("Runtime dependencies"),
+    /class="finding-score-value">9.8/,
+  );
+  assert.match(html, /<summary>Match evidence<\/summary>/);
   assert.match(html, /exact-direct-match/);
   assert.match(html, /Download Grype findings/);
   const pagePath = join(root, "site/index.html");
